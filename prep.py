@@ -1,50 +1,45 @@
 """
 Preparation Module for SLA - SCA
 
-This script composes of various helper functions but its main role is the
-prepare and work on a single image at a time. The script exposes a high level
+This script composes of various helper functions but its main role is to prepare and provide an image collection. The script exposes a high level
 function which does all the heavy lifting.
 
-The composite image is generated with this script and used in main code for
-further processing.
+The composite image is generated with this script and used in main code for further processing.
 """
-
 
 import ee
 from ee_plugin import Map
 
-l8 = ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
-l7 = ee.ImageCollection("LANDSAT/LE07/C01/T1_TOA")
-l5 = ee.ImageCollection("LANDSAT/LT05/C01/T1_TOA")
-s2 = ee.ImageCollection("COPERNICUS/S2")
-RGI = ee.FeatureCollection("users/josiaszeller/RGVI_v6"
+ING = ee.FeatureCollection(
+    "users/lcsruiz/Mapping_seasonal_glacier_melt_across_the_ANDES_with_SAR/Glaciares_Arg_Andes_dissolve")
+L5 = ee.ImageCollection("LANDSAT/LT05/C01/T1_TOA")
+L7 = ee.ImageCollection("LANDSAT/LE07/C01/T1_TOA")
+L8 = ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
+S2 = ee.ImageCollection("COPERNICUS/S2")
 
 
-def imageCollection(glimsid, startyear, endyear, cloudiness, coverage, filterDOYstart, filterDOYend, hsboolean, dem):
+def imageCollection(ing_id, startyear, endyear, cloudiness, coverage, filterDOYstart, filterDOYend, hsboolean, dem):
 
-    s2_bands=ee.List(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B10', 'B11', 'B12', 'QA60'])
-    s2_band_names=ee.List(['cb', 'blue', 'green', 'red', 're1', 're2', 're3',
+    l5_bands = ee.List(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'BQA'])
+    l5_band_names = ee.List(['blue', 'green', 'red', 'nir', 'swir1', 'tir1', 'swir2', 'BQA'])
+
+    l7_bands = ee.List(['B1', 'B2', 'B3', 'B4', 'B5', 'B6_VCID_1', 'B7', 'BQA'])
+    l7_band_names = ee.List(['blue', 'green', 'red', 'nir', 'swir1', 'tir1', 'swir2', 'BQA'])
+
+    l8_bands = ee.List(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B10', 'B11', 'BQA'])
+    l8_band_names = ee.List(['cb', 'blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'tir1', 'tir2', 'BQA'])
+
+    s2_bands = ee.List(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B10', 'B11', 'B12', 'QA60'])
+    s2_band_names = ee.List(['cb', 'blue', 'green', 'red', 're1', 're2', 're3',
                             'nir', 're4', 'vapor', 'cirrus', 'swir1', 'swir2', 'BQA'])
 
-    l8_bands=ee.List(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B10', 'B11', 'BQA'])
-    l8_band_names=ee.List(['cb', 'blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'tir1', 'tir2', 'BQA'])
+    geometry = ING.filterMetadata('ID_local', 'equals', ing_id)
 
-    l7_bands=ee.List(['B1', 'B2', 'B3', 'B4', 'B5', 'B6_VCID_1', 'B7', 'BQA'])
-    l7_band_names=ee.List(['blue', 'green', 'red', 'nir', 'swir1', 'tir1', 'swir2', 'BQA'])
+    start_date = ee.Date.fromYMD(startyear, 1, 1)
+    end_date = ee.Date.fromYMD(endyear, 12, 31)
 
-    l5_bands=ee.List(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'BQA'])
-    l5_band_names=ee.List(['blue', 'green', 'red', 'nir', 'swir1', 'tir1', 'swir2', 'BQA'])
-# /   PREPARE AND FILTER RGI INVENTORY V6   ##########/
-
-# filter the rgi inventory with the input of the glimsID --> get the geometry
-geometry=RGI.filterMetadata('GLIMSId', 'equals', glimsid);
-
-# PREPARE FILTERING  OF SAT-DATASETS
-        startdate=ee.Date.fromYMD(startyear, 1, 1);  # first day of the year
-        enddate=ee.Date.fromYMD(endyear, 12, 31);  # last day of the year
-
-geometryraw=geometry.geometry()
-geometrybuffered=geometryraw.buffer(2500, 5)
+    geometry_raw = geometry.geometry()
+    geometry_buffered = geometry_raw.buffer(2500, 5)
 
 # CLOUD SCORE FOR MASKING#####################/
 # Compute a cloud score.  This expects the input image to have the common band names
@@ -59,20 +54,20 @@ def cloudScore(img):
         .subtract(thresholds[0]).divide(thresholds[1] - thresholds[0])
 
   # Compute several indicators of cloudyness and take the minimum of them.
-  score=ee.Image(1.0)
+  score = ee.Image(1.0)
   # Clouds are reasonably bright in the blue band.
-  score=score.min(rescale(img, 'img.blue', [0.1, 0.3]))
+  score = score.min(rescale(img, 'img.blue', [0.1, 0.3]))
 
   # Clouds are reasonably bright in all visible bands.
-  score=score.min(rescale(img, 'img.red + img.green + img.blue', [0.2, 0.8]))
+  score = score.min(rescale(img, 'img.red + img.green + img.blue', [0.2, 0.8]))
 
   # Clouds are reasonably bright in all infrared bands.
-  score=score.min(
+  score = score.min(
       rescale(img, 'img.nir + img.swir1 + img.swir2', [0.3, 0.8]))
 
   # However, clouds are not snow.
-  ndsi=img.normalizedDifference(['green', 'swir1'])
-  score2=score.min(rescale(ndsi, 'img', [0.7, 0.6]))
+  ndsi = img.normalizedDifference(['green', 'swir1'])
+  score2 = score.min(rescale(ndsi, 'img', [0.7, 0.6]))
 
  score3=ee.Image(1).subtract(score2).select([0], ['cloudscore'])
 
