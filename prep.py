@@ -144,85 +144,95 @@ def add_albedo(img):
     return img.addBands(albedo)
 
 
-##############FUNCTION: ADD CLOUD-NoCLOUD-RATIO PER IMAGE############
-def cloudfilterlandsat(data):
-                    input = data.clip(geometry);  # get the right geometry
-                    cloudfreefunc = cloudScore(input);  # calculate the score
-                    # calculate the area for the image when the detected clouds are masked
-                    countcf = areacalc(cloudfreefunc);
-                    countnorm = areacalc(input);  # calculate the area for the image (with clouds)
-                    nocloud = countcf.divide(countnorm).multiply(100);  # calculate ratio
-                return nocloud;  # return number
+def cloud_nocloud_ratio(data):
+    """
+    Calculate the cloud/no-cloud ratio per image.
+    """
+
+    input = data.clip(geometry)
+    cloudfreefunc = cloud_score(input)
+
+    # calculate the area for the image with clouds and when the detected clouds are masked
+    countcf, countnorm = area_calc(cloudfreefunc), area_calc(input)
+
+    return countcf.divide(countnorm).multiply(100)
 
 
-# function to add all the 'Quality-Information' to the image
-def addquainfo(data)  # data is one image from the imagecollection (unfiltered):
-                    clip=data.clip(geometrybuffered);  # clip image
-                    # calculate the cloudscore with the function above, save number with the ratio
-                    quality=cloudfilterlandsat(clip);
-                    image=clip.set('noclouds', quality);  # set cloudratio to the image properties
-                    Sens=clip.get('SPACECRAFT_ID')
-                    # calculate the area for the image to detect, if there are parts without information
-                    areaRGIoutline=areacalcrast(clip);
-                    areaIMGglacier=areaIMGglacier1;  # areacalcrast(areatotal1)
-                    # calculate ration of coverage from one image over the glacier
-                    arearatio=areaRGIoutline.divide(areaIMGglacier).multiply(100);
-                    image1=image  .set('GLIMSID', glimsid)  # set glimsid to image \
-                                        .set('areaRGIoutline', areaRGIoutline) \
-                                        .set('areaIMGglacier', areaIMGglacier) \
-                                        .set('arearatio', arearatio) \
-                                        .set('SENSOR', Sens) \
-                                        .set('hsboolean', hsboolean) \
-                                        .set('deminfo', dem)
+def add_quality_info(data):
+    """
+    Add all the 'Quality-Information' to the image
+    """
 
-              return image1
+    # TODO: VEER CHECK THIS FUNCTION. DO WE NEED RGI
+    # TACKLE GLOBAL VARIABLES
 
+    clip = data.clip(geometrybuffered)
+    quality = cloud_nocloud_ratio(clip)
+    image = clip.set('noclouds', quality)
+    sens = clip.get('SPACECRAFT_ID')
 
-def cloudfiltersentinel(data):
-                    input=data.clip(geometry)
-                    cloudfreefunc=cloudScore(input)
-                    countcf=areacalc(cloudfreefunc)
-                    countnorm=areacalc(input)
-                    nocloud=countcf.divide(countnorm).multiply(100)
-              return nocloud
+    # calculate the area for the image to detect, if there are parts without information
+    areaRGIoutline = area_calc_rast(clip)  # TODO DO WE NEED THIS? ASK
+    areaIMGglacier = areaIMGglacier1  # areacalcrast(areatotal1)
+
+    # calculate ratio of coverage from one image over the glacier
+    arearatio = areaRGIoutline.divide(areaIMGglacier).multiply(100)
+    return (image.set('ING_ID', ing_id)
+                    .set('areaRGIoutline', areaRGIoutline)
+                    .set('areaIMGglacier', areaIMGglacier)
+                    .set('arearatio', arearatio)
+                    .set('SENSOR', sens)
+                    .set('hsboolean', hsboolean)
+                    .set('deminfo', dem))
 
 
-def saddquainfo(data):
-                    clip=data.clip(geometrybuffered)
-                    quality=cloudfiltersentinel(clip)
-                    areaRGIoutline=areacalcrast(clip)
-                    areaIMGglacier=areaIMGglacier1
-                    arearatio=areaRGIoutline.divide(areaIMGglacier).multiply(100)
-                    rightangle=ee.Number(90)
-                    sunAZ=ee.Number(clip.get('MEAN_SOLAR_AZIMUTH_ANGLE'))
-                    sunELZenith=ee.Number(clip.get('MEAN_SOLAR_ZENITH_ANGLE'))
-                    Sens=(clip.get('SPACECRAFT_NAME'))
-                    sunEL=rightangle.subtract(ee.Number(sunELZenith))
-                    image=clip.set('noclouds', quality)
-                    image1=image.set('GLIMSID', glimsid) \
-                        .set('areaRGIoutline', areaRGIoutline) \
-                        .set('areaIMGglacier', areaIMGglacier) \
-                        .set('arearatio', arearatio) \
-                        .set('SUN_AZIMUTH', sunAZ) \
-                        .set('SUN_ELEVATION', sunEL) \
-                        .set('SENSOR', Sens) \
-                        .set('hsboolean', hsboolean) \
-                        .set('deminfo', dem)
-              return image1
+def cloud_filter_sentinel(data):
 
+    input = data.clip(geometry)
+    cloudfreefunc = cloud_score(input)
+    countcf = area_calc(cloudfreefunc)
+    countnorm = area_calc(input)
+    return countcf.divide(countnorm).multiply(100)
+
+
+def s_add_quality_info(data):
+
+    clip = data.clip(geometrybuffered)
+    quality = cloud_filter_sentinel(clip)
+    areaRGIoutline = area_calc_rast(clip)
+    areaIMGglacier = areaIMGglacier1
+    arearatio = areaRGIoutline.divide(areaIMGglacier).multiply(100)
+    rightangle = ee.Number(90)
+    sun_az = ee.Number(clip.get('MEAN_SOLAR_AZIMUTH_ANGLE'))
+    sun_el_zenith = ee.Number(clip.get('MEAN_SOLAR_ZENITH_ANGLE'))
+    sens = (clip.get('SPACECRAFT_NAME'))
+    sunEL = rightangle.subtract(ee.Number(sun_el_zenith))
+    image = clip.set('noclouds', quality)
+    
+    return (image.set('ING_ID', ing_id)
+        .set('areaINGoutline', areaINGoutline)
+        .set('areaIMGglacier', areaIMGglacier)
+        .set('arearatio', arearatio)
+        .set('SUN_AZIMUTH', sun_az)
+        .set('SUN_ELEVATION', sunEL)
+        .set('SENSOR', sens)
+        .set('hsboolean', hsboolean)
+        .set('deminfo', dem))
 
 
 # RUN ALL FILTERS FOR EVERY SENSOR    #################/
-cloudfilter1=ee.Filter.gt('noclouds', cloudiness);  # get the threshold (in %) from the input and create the cloudfilter
-coveragefilter=ee.Filter.gt('arearatio', coverage);  # get threshold in % from input
+# get the threshold (in %) from the input and create the cloudfilter
+cloudfilter1 = ee.Filter.gt('noclouds', cloudiness);
+coveragefilter = ee.Filter.gt('arearatio', coverage);  # get threshold in % from input
 
-landsat5data=l5.filterBounds(geometry)  # filter on the base of the choosen geometry \
+landsat5data = l5.filterBounds(geometry)  # filter on the base of the choosen geometry \
                 .filterDate(startdate, enddate) \
                 .filter(ee.Filter.calendarRange(filterDOYstart, filterDOYend, 'day_of_year'))
 
+
 def func_owr(img)  # create image collection:
-                  img1=img.select(l5_bands).rename(l5_band_names);  # rename all images with the correct names
-                  img2=img1  # .reproject('EPSG:32632',None, 30)
+                  img1 = img.select(l5_bands).rename(l5_band_names);  # rename all images with the correct names
+                  img2 = img1  # .reproject('EPSG:32632',None, 30)
                   return img2 \
                 .map(func_owr) \
                 .map(addquainfo) \
@@ -231,12 +241,13 @@ def func_owr(img)  # create image collection:
                 .map(addAlbedo)
 
 
-landsat7data=l7.filterBounds(geometry) \
+landsat7data = l7.filterBounds(geometry) \
                   .filterDate(startdate, enddate).filter(ee.Filter.calendarRange(filterDOYstart, filterDOYend, 'day_of_year'))
 
+
 def func_xbh(img):
-                  img1=img.select(l7_bands).rename(l7_band_names)
-                  img2=img1  # .reproject('EPSG:32632',None, 30)
+                  img1 = img.select(l7_bands).rename(l7_band_names)
+                  img2 = img1  # .reproject('EPSG:32632',None, 30)
                   return img2 \
                   .map(func_xbh) \
                 .map(addquainfo) \
@@ -245,12 +256,13 @@ def func_xbh(img):
                 .map(addAlbedo)
 
 
-landsat8data=l8.filterBounds(geometry) \
+landsat8data = l8.filterBounds(geometry) \
                 .filterDate(startdate, enddate).filter(ee.Filter.calendarRange(filterDOYstart, filterDOYend, 'day_of_year'))
 
+
 def func_tfu(img):
-                  img1=img.select(l8_bands).rename(l8_band_names)
-                  img2=img1  # .reproject('EPSG:32632',None, 30)
+                  img1 = img.select(l8_bands).rename(l8_band_names)
+                  img2 = img1  # .reproject('EPSG:32632',None, 30)
                   return img2 \
                 .map(func_tfu) \
                 .map(addquainfo) \
@@ -259,21 +271,23 @@ def func_tfu(img):
                 .map(addAlbedo)
 
 
-sentineldata=s2.filterBounds(geometry) \
+sentineldata = s2.filterBounds(geometry) \
                 .filterDate(startdate, enddate).filter(ee.Filter.calendarRange(filterDOYstart, filterDOYend, 'day_of_year'))
 
+
 def func_ngk(img):
-                  img1=img.select(s2_bands).rename(s2_band_names)
-                  img2=img1  # .reproject('EPSG:32632',None, 30)
+                  img1 = img.select(s2_bands).rename(s2_band_names)
+                  img2 = img1  # .reproject('EPSG:32632',None, 30)
                   return img2 \
                 .map(func_ngk) \
                 .map(saddquainfo) \
                 .filter(cloudfilter1) \
                 .filter(coveragefilter)
 
+
 def func_jty(img):
                   # scale the pixelvalues to a ratio between 0 and 1
-                  img1=img \
+                  img1 = img \
                     .select((['cb', 'blue', 'green', 'red', 're1', 're2', 're3', 'nir', 're4', 'vapor', 'cirrus', 'swir1', 'swir2'])) \
                     .divide(10000)
                   return img.addBands(img1, None, True) \
@@ -281,70 +295,68 @@ def func_jty(img):
 ).map(addAlbedo)
 
 
-
-
-
 ).map(addAlbedo)
+
 
 ###########   FILTER DUBLICATES WITH SAME DATE    #########################
 # sort all collection (for each sensor), that the dublicate filter works
-landsat5datapre = landsat5data.sort('system:time_start')
-landsat7datapre = landsat7data.sort('system:time_start')
-landsat8datapre = landsat8data.sort('system:time_start')
-sentineldatapre = sentineldata.sort('system:time_start')
+landsat5datapre=landsat5data.sort('system:time_start')
+landsat7datapre=landsat7data.sort('system:time_start')
+landsat8datapre=landsat8data.sort('system:time_start')
+sentineldatapre=sentineldata.sort('system:time_start')
 # Function to detect dublicates
 def startdublicatfiltering(imgcollection):
 
 
-condition1 = imgcollection.size()
+condition1=imgcollection.size()
 
 
 def normal():
 
 
-list = imgcollection.toList(imgcollection.size())
-image = ee.Image(list.get(0))
-dummyimage = ee.Image(1).set('system:time_start', 0)
+list=imgcollection.toList(imgcollection.size())
+image=ee.Image(list.get(0))
+dummyimage=ee.Image(1).set('system:time_start', 0)
 # Add in the end of the list a dummy image
-list = list.add(dummyimage)
+list=list.add(dummyimage)
 
 
 def detect_dublicates(image):
-  isdublicate = ee.String("")
-  number = list.indexOf(image)
-  image1 = ee.Image(list.get(number.add(1)))
+  isdublicate=ee.String("")
+  number=list.indexOf(image)
+  image1=ee.Image(list.get(number.add(1)))
   # Compare the image(0) in the ImageCollection with the image(1) in the List
-  date1 = image.date().format("Y-M-d")
-  date2 = image1.date().format("Y-M-d")
-  cond = ee.Algorithms.IsEqual(date1, date2)
-  isdublicate = ee.String(ee.Algorithms.If({'condition': cond,
+  date1=image.date().format("Y-M-d")
+  date2=image1.date().format("Y-M-d")
+  cond=ee.Algorithms.IsEqual(date1, date2)
+  isdublicate=ee.String(ee.Algorithms.If({'condition': cond,
                   'TrueCase': "dublicate",
                   'FalseCase': "no_dublicate"}))
     return image.set({"status_dublicate": isdublicate})
 
 
-imgcoll_added = imgcollection.map(detect_dublicates)
-imgcollfiltered = imgcoll_added.filter(ee.Filter.eq("status_dublicate", "no_dublicate"))
+imgcoll_added=imgcollection.map(detect_dublicates)
+imgcollfiltered=imgcoll_added.filter(ee.Filter.eq("status_dublicate", "no_dublicate"))
 return imgcollfiltered
 
 
 def noimage():
         #  Create Empty ImageCollection
-            emptyimgcol = ee.ImageCollection(ee.Image(5)).filter(ee.Filter.eq('system:index', 0))
+            emptyimgcol=ee.ImageCollection(ee.Image(5)).filter(ee.Filter.eq('system:index', 0))
   return emptyimgcol
 
 
-ifNone = ee.Algorithms.If(condition1, normal(), noimage())
+ifNone=ee.Algorithms.If(condition1, normal(), noimage())
 return(ifNone)
 
 # merge does not wirk with at the moment! (find out, how an empty imagecollection can be merged)
-landsat5datafi = ee.ImageCollection(startdublicatfiltering(landsat5datapre))
-landsat7datafi = ee.ImageCollection(startdublicatfiltering(landsat7datapre))
-landsat8datafi = ee.ImageCollection(startdublicatfiltering(landsat8datapre))
-sentineldatafi = ee.ImageCollection(startdublicatfiltering(sentineldatapre))
+landsat5datafi=ee.ImageCollection(startdublicatfiltering(landsat5datapre))
+landsat7datafi=ee.ImageCollection(startdublicatfiltering(landsat7datapre))
+landsat8datafi=ee.ImageCollection(startdublicatfiltering(landsat8datapre))
+sentineldatafi=ee.ImageCollection(startdublicatfiltering(sentineldatapre))
 
 # Merge all individual collections per Sensor to one collection
-imagecol_all = landsat5datafi.merge(landsat7datafi).merge(landsat8datafi).merge(sentineldatafi)
+imagecol_all=landsat5datafi.merge(landsat7datafi).merge(landsat8datafi).merge(sentineldatafi)
 
 return imagecol_all
 
