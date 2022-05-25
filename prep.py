@@ -41,46 +41,53 @@ def imageCollection(ing_id, startyear, endyear, cloudiness, coverage, filterDOYs
     geometry_raw = geometry.geometry()
     geometry_buffered = geometry_raw.buffer(2500, 5)
 
-# CLOUD SCORE FOR MASKING#####################/
-# Compute a cloud score.  This expects the input image to have the common band names
-# Cloud Score is only for the nocloud-ratio and has no influence on the classification. If the cloudratio detected with this score to high,
-# it's possible that the images are filtered within the next step. But: All images are included in the collection
+
+def rescale(img, exp, thresholds):
+    """
+    Applies an expression to an image and linearly rescales it based on threshold value.
+    """
+
+    return img.expression(exp, {'img': img}).subtract(thresholds[0]).divide(thresholds[1] - thresholds[0])
 
 
-def cloudScore(img):
-  # A helper to apply an expression and linearly rescale the output.
-  def rescale(img, exp, thresholds):
-    return img.expression(exp, {'img': img}) \
-        .subtract(thresholds[0]).divide(thresholds[1] - thresholds[0])
+def cloud_score(img):
+    """
+    Compute the cloud score for masking. It expects the input image to have common band names.
 
-  # Compute several indicators of cloudyness and take the minimum of them.
-  score = ee.Image(1.0)
-  # Clouds are reasonably bright in the blue band.
-  score = score.min(rescale(img, 'img.blue', [0.1, 0.3]))
+    Cloud Score is only for the nocloud-ratio and has no influence on the classification.
+    If the cloud-ratio detected with this score too high then it's possible that the images are filtered
+    within the next step but all images are included in the collection.
+    """
 
-  # Clouds are reasonably bright in all visible bands.
-  score = score.min(rescale(img, 'img.red + img.green + img.blue', [0.2, 0.8]))
+    # Compute several indicators of cloudyness and take the minimum of them.
+    score = ee.Image(1.0)
 
-  # Clouds are reasonably bright in all infrared bands.
-  score = score.min(
-      rescale(img, 'img.nir + img.swir1 + img.swir2', [0.3, 0.8]))
+    # Clouds are reasonably bright in the blue band.
+    score = score.min(rescale(img, 'img.blue', [0.1, 0.3]))
 
-  # However, clouds are not snow.
-  ndsi = img.normalizedDifference(['green', 'swir1'])
-  score2 = score.min(rescale(ndsi, 'img', [0.7, 0.6]))
+    # Clouds are reasonably bright in all visible bands.
+    score = score.min(rescale(img, 'img.red + img.green + img.blue', [0.2, 0.8]))
 
- score3=ee.Image(1).subtract(score2).select([0], ['cloudscore'])
+    # Clouds are reasonably bright in all infrared bands.
+    score = score.min(rescale(img, 'img.nir + img.swir1 + img.swir2', [0.3, 0.8]))
 
-  img1_1=img.addBands(score3);  # add band with cloud score per pixel
-  img1_2=img1_1.select('cloudscore').gt(0.7);  # select cloud pixels to mask original image
-  img1_3=img.mask(img1_2);  # mask image
-  return img1_3
+    # However, clouds are not snow.
+    ndsi = img.normalizedDifference(['green', 'swir1'])
+    score2 = score.min(rescale(ndsi, 'img', [0.7, 0.6]))
+    score3 = ee.Image(1).subtract(score2).select([0], ['cloudscore'])
+
+    # add band with cloud score per pixel and select cloud pixels to mask original image
+    img1_1 = img.addBands(score3)
+    img1_2 = img1_1.select('cloudscore').gt(0.7)
+    img1_3 = img.mask(img1_2)
+
+    return img1_3
 
 
 # function to calculate the area of an image (area of a band without masked pixels)
 def areacalcrast(img):
-                img1=img.select('green').neq(0);  # select not masked pixels
-                fc1=img1.reduceToVectors({  # produces a FeatureCollection
+                img1 = img.select('green').neq(0);  # select not masked pixels
+                fc1 = img1.reduceToVectors({  # produces a FeatureCollection
                                       'reducer': ee.Reducer.countEvery(),
                                       'geometry': geometry,
                                       'scale': 30,
