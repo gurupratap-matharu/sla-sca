@@ -41,6 +41,12 @@ def imageCollection(ing_id, startyear, endyear, cloudiness, coverage, filterDOYs
     geometry_raw = geometry.geometry()
     geometry_buffered = geometry_raw.buffer(2500, 5)
 
+    # Calculate glacier area
+    areatotal1 = ee.Image(1).clip(geometry).select('constant').rename('green')
+
+    areatotal = geometry.first().get('Area')
+    areaIMGglacier1 = area_calc_rast(areatotal1)
+
 
 def rescale(img, exp, thresholds):
     """
@@ -84,69 +90,68 @@ def cloud_score(img):
     return img1_3
 
 
-# function to calculate the area of an image (area of a band without masked pixels)
-def areacalcrast(img):
-                img1 = img.select('green').neq(0);  # select not masked pixels
-                fc1 = img1.reduceToVectors({  # produces a FeatureCollection
-                                      'reducer': ee.Reducer.countEvery(),
-                                      'geometry': geometry,
-                                      'scale': 30,
-                                      'maxPixels': 1e10,
-                                      'bestEffort': True,
-                                      'crs': 'EPSG:4326'  # use EPSG:4326 -_> explicit that thers no confusion and no check needed for all images
-                                  })
-               area=fc1.reduceColumns({
-                                      'reducer': ee.Reducer.sum(),
-                                      'selectors': ['count'],
-                                  })
-              area1=ee.Number(area.get('sum')).divide(1000);  # return the number of the area
-            return area1;  # returns a feature
+def area_calc_rast(img):
+    """
+    Calculate the area of an image (area of a band without masked pixels)
+    """
+
+    # select not masked pixels
+    img1 = img.select('green').neq(0)
+    fc1 = img1.reduceToVectors({
+        'reducer': ee.Reducer.countEvery(),
+        'geometry': geometry,
+        'scale': 30,
+        'maxPixels': 1e10,
+        'bestEffort': True,
+        'crs': 'EPSG:4326'
+    })
+
+    area = fc1.reduceColumns({
+        'reducer': ee.Reducer.sum(),
+        'selectors': ['count'],
+    })
+
+    return ee.Number(area.get('sum')).divide(1000)
 
 
+def area_calc(image):
 
-# FUNCTION: CALCULATE AREA    ###############/
-def areacalc(image4)  # to calculate the area of an image (area of a band without masked pixels):
-                prep=image4.select('green');  # take one bands (here green) to calculate the area.
-                pixelarea=prep.multiply(ee.Image.pixelArea())
+    prep = image.select('green')
+    pixelarea = prep.multiply(ee.Image.pixelArea())
 
-                  areacalc=pixelarea.reduceRegion({
-                       'reducer': ee.Reducer.sum(),
-                       'geometry': geometry,
-                       'scale': 30,
-                       'bestEffort': True,
-                       'maxPixels': 1e10
-                  })
-              numb=areacalc.getNumber('green')
-              return numb;  # return the number of the area
+    return pixelarea.reduceRegion({
+        'reducer': ee.Reducer.sum(),
+        'geometry': geometry,
+        'scale': 30,
+        'bestEffort': True,
+        'maxPixels': 1e10
+    }).getNumber('green')
 
 
-##############   CALCULATE GLACIER AREA   ###################
-areatotal1=ee.Image(1).clip(geometry).select('constant').rename('green')
+def add_albedo(img):
+    """
+    Add Albedo to each image based on LIANG (2000) - Narrowband to broadband conversions
+    of land surface albedo: I Algorithms
+    """
 
-areatotal=geometry.first().get('Area');  # areacalc(areatotal1)
-areaIMGglacier1=areacalcrast(areatotal1);  # Var is a number that is included in the prop. for each image
+    albedo = (((img.select('blue').multiply(0.356))
+                    .add(img.select('red').multiply(0.130))
+                    .add(img.select('nir').multiply(0.373))
+                    .add(img.select('swir1').multiply(0.085))
+                    .add(img.select('swir2').multiply(0.072))
+                    .subtract(0.0018).rename(['albedo'])).divide(1.016))
 
-###########      Function to add ALBEDO to every image   ########
-# Based on LIANG (2000) - Narrowband to broadband conversions of land surface albedo: I Algorithms
-def addAlbedo(img):
-  albedo=(((img.select('blue').multiply(0.356)) \
-                .add(img.select('red').multiply(0.130)) \
-                .add(img.select('nir').multiply(0.373)) \
-                .add(img.select('swir1').multiply(0.085)) \
-                .add(img.select('swir2').multiply(0.072)) \
-                .subtract(0.0018).rename(['albedo'])).divide(1.016))
-  imgexp=img.addBands(albedo)
-  return imgexp
+    return img.addBands(albedo)
 
 
 ##############FUNCTION: ADD CLOUD-NoCLOUD-RATIO PER IMAGE############
 def cloudfilterlandsat(data):
-                    input=data.clip(geometry);  # get the right geometry
-                    cloudfreefunc=cloudScore(input);  # calculate the score
+                    input = data.clip(geometry);  # get the right geometry
+                    cloudfreefunc = cloudScore(input);  # calculate the score
                     # calculate the area for the image when the detected clouds are masked
-                    countcf=areacalc(cloudfreefunc);
-                    countnorm=areacalc(input);  # calculate the area for the image (with clouds)
-                    nocloud=countcf.divide(countnorm).multiply(100);  # calculate ratio
+                    countcf = areacalc(cloudfreefunc);
+                    countnorm = areacalc(input);  # calculate the area for the image (with clouds)
+                    nocloud = countcf.divide(countnorm).multiply(100);  # calculate ratio
                 return nocloud;  # return number
 
 
