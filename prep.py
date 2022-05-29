@@ -8,7 +8,6 @@ The composite image is generated with this script and used in main code for furt
 """
 
 import ee
-from ee_plugin import Map
 
 ING = ee.FeatureCollection(
     "users/lcsruiz/Mapping_seasonal_glacier_melt_across_the_ANDES_with_SAR/Glaciares_Arg_Andes_dissolve")
@@ -17,8 +16,23 @@ L7 = ee.ImageCollection("LANDSAT/LE07/C01/T1_TOA")
 L8 = ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
 S2 = ee.ImageCollection("COPERNICUS/S2")
 
+"""
+Test data....
 
-def imageCollection(ing_id, startyear, endyear, cloudiness, coverage, filterDOYstart, filterDOYend, hsboolean, dem):
+ing_id = 'G718255O411666S'
+startyear =           ee.Number(2022) #
+endyear =             ee.Number(2022) # Año de fin del estudio
+filterDOYstart =      ee.Number(50)   # Start of Range: use DOY-Number to filter the range
+filterDOYend =        ee.Number(200)  # End of Range: DOY-Number to filter the range
+cloudiness =          ee.Number(50)   #% (Area over the Glacier that is not covered with Clouds)
+coverage =            50             #percentage of the glacier area, that has to be cove
+
+
+https://code.earthengine.google.com/?asset=users/lcsruiz/Mapping_seasonal_glacier_melt_across_the_ANDES_with_SAR/Glaciares_Arg_Andes_dissolve
+"""
+
+
+def imageCollection(ing_id, start_year, end_year, cloudiness, coverage, doy_start, doy_end, hsboolean, dem):
 
     l5_bands = ee.List(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'BQA'])
     l5_band_names = ee.List(['blue', 'green', 'red', 'nir', 'swir1', 'tir1', 'swir2', 'BQA'])
@@ -33,11 +47,14 @@ def imageCollection(ing_id, startyear, endyear, cloudiness, coverage, filterDOYs
     s2_band_names = ee.List(['cb', 'blue', 'green', 'red', 're1', 're2', 're3',
                             'nir', 're4', 'vapor', 'cirrus', 'swir1', 'swir2', 'BQA'])
 
+    start_date = ee.Date.fromYMD(start_year, 1, 1)
+    end_date = ee.Date.fromYMD(end_year, 12, 31)
+    calendar_filter = ee.Filter.calendarRange(doy_start, doy_end, 'day_of_year')
+
+    cloud_filter = ee.Filter.gt('noclouds', cloudiness)
+    coverage_filter = ee.Filter.gt('arearatio', coverage)
+
     geometry = ING.filterMetadata('ID_local', 'equals', ing_id)
-
-    start_date = ee.Date.fromYMD(startyear, 1, 1)
-    end_date = ee.Date.fromYMD(endyear, 12, 31)
-
     geometry_raw = geometry.geometry()
     geometry_buffered = geometry_raw.buffer(2500, 5)
 
@@ -46,6 +63,18 @@ def imageCollection(ing_id, startyear, endyear, cloudiness, coverage, filterDOYs
 
     areatotal = geometry.first().get('Area')
     areaIMGglacier1 = area_calc_rast(areatotal1)
+
+    L5_FILTERED = L5.filterBounds(geometry) \
+                    .filterDate(start_date, end_date) \
+                    .filter(calendar_filter)
+
+    L7_FILTERED = L7.filterBounds(geometry) \
+                    .filterDate(start_date, end_date) \
+                    .filter(calendar_filter)
+
+    L8_FILTERED = L8.filterBounds(geometry) \
+                    .filterDate(start_date, end_date) \
+                    .filter(calendar_filter)
 
 
 def rescale(img, exp, thresholds):
@@ -208,7 +237,7 @@ def s_add_quality_info(data):
     sens = (clip.get('SPACECRAFT_NAME'))
     sunEL = rightangle.subtract(ee.Number(sun_el_zenith))
     image = clip.set('noclouds', quality)
-    
+
     return (image.set('ING_ID', ing_id)
         .set('areaINGoutline', areaINGoutline)
         .set('areaIMGglacier', areaIMGglacier)
@@ -220,29 +249,15 @@ def s_add_quality_info(data):
         .set('deminfo', dem))
 
 
-# RUN ALL FILTERS FOR EVERY SENSOR    #################/
-# get the threshold (in %) from the input and create the cloudfilter
-cloudfilter1 = ee.Filter.gt('noclouds', cloudiness);
-coveragefilter = ee.Filter.gt('arearatio', coverage);  # get threshold in % from input
-
-landsat5data = l5.filterBounds(geometry)  # filter on the base of the choosen geometry \
-                .filterDate(startdate, enddate) \
-                .filter(ee.Filter.calendarRange(filterDOYstart, filterDOYend, 'day_of_year'))
-
-
 def func_owr(img)  # create image collection:
                   img1 = img.select(l5_bands).rename(l5_band_names);  # rename all images with the correct names
                   img2 = img1  # .reproject('EPSG:32632',None, 30)
                   return img2 \
                 .map(func_owr) \
                 .map(addquainfo) \
-                .filter(cloudfilter1) \
-                .filter(coveragefilter) \
+                .filter(cloud_filter) \
+                .filter(coverage_filter) \
                 .map(addAlbedo)
-
-
-landsat7data = l7.filterBounds(geometry) \
-                  .filterDate(startdate, enddate).filter(ee.Filter.calendarRange(filterDOYstart, filterDOYend, 'day_of_year'))
 
 
 def func_xbh(img):
@@ -251,13 +266,9 @@ def func_xbh(img):
                   return img2 \
                   .map(func_xbh) \
                 .map(addquainfo) \
-                .filter(cloudfilter1) \
-                .filter(coveragefilter) \
+                .filter(cloud_filter) \
+                .filter(coverage_filter) \
                 .map(addAlbedo)
-
-
-landsat8data = l8.filterBounds(geometry) \
-                .filterDate(startdate, enddate).filter(ee.Filter.calendarRange(filterDOYstart, filterDOYend, 'day_of_year'))
 
 
 def func_tfu(img):
@@ -266,8 +277,8 @@ def func_tfu(img):
                   return img2 \
                 .map(func_tfu) \
                 .map(addquainfo) \
-                .filter(cloudfilter1) \
-                .filter(coveragefilter) \
+                .filter(cloud_filter) \
+                .filter(coverage_filter) \
                 .map(addAlbedo)
 
 
@@ -281,8 +292,8 @@ def func_ngk(img):
                   return img2 \
                 .map(func_ngk) \
                 .map(saddquainfo) \
-                .filter(cloudfilter1) \
-                .filter(coveragefilter)
+                .filter(cloud_filter) \
+                .filter(coverage_filter)
 
 
 def func_jty(img):
@@ -300,7 +311,7 @@ def func_jty(img):
 
 ###########   FILTER DUBLICATES WITH SAME DATE    #########################
 # sort all collection (for each sensor), that the dublicate filter works
-landsat5datapre=landsat5data.sort('system:time_start')
+landsat5datapre=L5_FILTERED.sort('system:time_start')
 landsat7datapre=landsat7data.sort('system:time_start')
 landsat8datapre=landsat8data.sort('system:time_start')
 sentineldatapre=sentineldata.sort('system:time_start')
@@ -359,7 +370,3 @@ sentineldatafi=ee.ImageCollection(startdublicatfiltering(sentineldatapre))
 imagecol_all=landsat5datafi.merge(landsat7datafi).merge(landsat8datafi).merge(sentineldatafi)
 
 return imagecol_all
-
-
-
-# hello
