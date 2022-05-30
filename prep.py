@@ -155,7 +155,7 @@ def imageCollection(
         .filterDate(start_date, end_date)
         .filter(calendar_filter)
         .map(lambda image: image.select(s2_bands).rename(s2_band_names))
-        .map(s_add_quality_info)
+        .map(sentinel_add_quality_info)
         .filter(cloud_filter)
         .filter(coverage_filter)
         .map(scale_s2_pixels)
@@ -190,7 +190,7 @@ def cloud_score(img):
     within the next step but all images are included in the collection.
     """
 
-    # Compute several indicators of cloudyness and take the minimum of them.
+    # Compute several indicators of cloudiness and take the minimum of them.
     score = ee.Image(1.0)
 
     # Clouds are reasonably bright in the blue band.
@@ -244,6 +244,9 @@ def area_calc_rast(img):
 
 
 def area_calc(image):
+    """
+    Calculates the green colored area in an image
+    """
 
     prep = image.select("green")
     pixelarea = prep.multiply(ee.Image.pixelArea())
@@ -266,7 +269,8 @@ def add_albedo(img):
     """
 
     albedo = (
-        (img.select("blue").multiply(0.356))
+        img.select("blue")
+        .multiply(0.356)
         .add(img.select("red").multiply(0.130))
         .add(img.select("nir").multiply(0.373))
         .add(img.select("swir1").multiply(0.085))
@@ -283,11 +287,11 @@ def cloud_nocloud_ratio(data):
     Calculate the cloud/no-cloud ratio per image.
     """
 
-    input = data.clip(geometry)
-    cloudfreefunc = cloud_score(input)
+    clipped_data = data.clip(geometry)
+    cloudfreefunc = cloud_score(clipped_data)
 
     # calculate the area for the image with clouds and when the detected clouds are masked
-    countcf, countnorm = area_calc(cloudfreefunc), area_calc(input)
+    countcf, countnorm = area_calc(cloudfreefunc), area_calc(clipped_data)
 
     return countcf.divide(countnorm).multiply(100)
 
@@ -323,21 +327,29 @@ def add_quality_info(data):
 
 
 def cloud_filter_sentinel(data):
+    """
+    Normalizes the cloud regions in sentinel images data
+    """
 
-    input = data.clip(geometry)
-    cloudfreefunc = cloud_score(input)
+    clipped_data = data.clip(geometry)
+
+    countnorm = area_calc(clipped_data)
+    cloudfreefunc = cloud_score(clipped_data)
     countcf = area_calc(cloudfreefunc)
-    countnorm = area_calc(input)
+
     return countcf.divide(countnorm).multiply(100)
 
 
-def s_add_quality_info(data):
+def sentinel_add_quality_info(data):
+    """
+    Add quality information for each sentinel image.
+    """
 
     clip = data.clip(geometrybuffered)
     quality = cloud_filter_sentinel(clip)
-    areaRGIoutline = area_calc_rast(clip)
+    area_rgi_outline = area_calc_rast(clip)
     areaIMGglacier = areaIMGglacier1
-    arearatio = areaRGIoutline.divide(areaIMGglacier).multiply(100)
+    arearatio = area_rgi_outline.divide(areaIMGglacier).multiply(100)
     rightangle = ee.Number(90)
     sun_az = ee.Number(clip.get("MEAN_SOLAR_AZIMUTH_ANGLE"))
     sun_el_zenith = ee.Number(clip.get("MEAN_SOLAR_ZENITH_ANGLE"))
@@ -360,7 +372,7 @@ def s_add_quality_info(data):
 
 def scale_s2_pixels(image):
     """
-    Scales the images from Sentinel sensor only to a ratio between 0 and 1
+    Scales the images from Sentinel sensor to a ratio between 0 and 1
     """
 
     custom_bands = [
