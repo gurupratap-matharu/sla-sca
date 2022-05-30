@@ -66,15 +66,49 @@ def imageCollection(ing_id, start_year, end_year, cloudiness, coverage, doy_star
 
     L5_FILTERED = L5.filterBounds(geometry) \
                     .filterDate(start_date, end_date) \
-                    .filter(calendar_filter)
+                    .filter(calendar_filter) \
+                    .map(lambda image: image.select(l5_bands).rename(l5_band_names)) \
+                    .map(add_quality_info) \
+                    .filter(cloud_filter) \
+                    .filter(coverage_filter) \
+                    .map(add_albedo) \
+                    .sort('system:time_start')
 
     L7_FILTERED = L7.filterBounds(geometry) \
                     .filterDate(start_date, end_date) \
-                    .filter(calendar_filter)
+                    .filter(calendar_filter) \
+                    .map(lambda image: image.select(l7_bands).rename(l7_band_names)) \
+                    .map(add_quality_info) \
+                    .filter(cloud_filter) \
+                    .filter(coverage_filter) \
+                    .map(add_albedo) \
+                    .sort('system:time_start')
 
     L8_FILTERED = L8.filterBounds(geometry) \
                     .filterDate(start_date, end_date) \
-                    .filter(calendar_filter)
+                    .filter(calendar_filter) \
+                    .map(lambda image: image.select(l8_bands).rename(l8_band_names)) \
+                    .map(add_quality_info) \
+                    .filter(cloud_filter) \
+                    .filter(coverage_filter) \
+                    .map(add_albedo) \
+                    .sort('system:time_start')
+
+    S2_FILTERED = S2.filterBounds(geometry) \
+                    .filterDate(start_date, end_date) \
+                    .filter(calendar_filter) \
+                    .map(lambda image: image.select(s2_bands).rename(s2_band_names)) \
+                    .map(s_add_quality_info) \
+                    .filter(cloud_filter) \
+                    .filter(coverage_filter) \
+                    .map(scale_s2_pixels) \
+                    .map(add_albedo) \
+                    .sort('system:time_start')
+
+    collection = L5_FILTERED.merge(L7_FILTERED).merge(L8_FILTERED).merge(S2_FILTERED)
+    collection = collection.map(remove_duplicates)
+
+    return collection
 
 
 def rescale(img, exp, thresholds):
@@ -164,11 +198,11 @@ def add_albedo(img):
     """
 
     albedo = (((img.select('blue').multiply(0.356))
-                    .add(img.select('red').multiply(0.130))
-                    .add(img.select('nir').multiply(0.373))
-                    .add(img.select('swir1').multiply(0.085))
-                    .add(img.select('swir2').multiply(0.072))
-                    .subtract(0.0018).rename(['albedo'])).divide(1.016))
+               .add(img.select('red').multiply(0.130))
+               .add(img.select('nir').multiply(0.373))
+               .add(img.select('swir1').multiply(0.085))
+               .add(img.select('swir2').multiply(0.072))
+               .subtract(0.0018).rename(['albedo'])).divide(1.016))
 
     return img.addBands(albedo)
 
@@ -207,12 +241,12 @@ def add_quality_info(data):
     # calculate ratio of coverage from one image over the glacier
     arearatio = areaRGIoutline.divide(areaIMGglacier).multiply(100)
     return (image.set('ING_ID', ing_id)
-                    .set('areaRGIoutline', areaRGIoutline)
-                    .set('areaIMGglacier', areaIMGglacier)
-                    .set('arearatio', arearatio)
-                    .set('SENSOR', sens)
-                    .set('hsboolean', hsboolean)
-                    .set('deminfo', dem))
+            .set('areaRGIoutline', areaRGIoutline)
+            .set('areaIMGglacier', areaIMGglacier)
+            .set('arearatio', arearatio)
+            .set('SENSOR', sens)
+            .set('hsboolean', hsboolean)
+            .set('deminfo', dem))
 
 
 def cloud_filter_sentinel(data):
@@ -239,134 +273,32 @@ def s_add_quality_info(data):
     image = clip.set('noclouds', quality)
 
     return (image.set('ING_ID', ing_id)
-        .set('areaINGoutline', areaINGoutline)
-        .set('areaIMGglacier', areaIMGglacier)
-        .set('arearatio', arearatio)
-        .set('SUN_AZIMUTH', sun_az)
-        .set('SUN_ELEVATION', sunEL)
-        .set('SENSOR', sens)
-        .set('hsboolean', hsboolean)
-        .set('deminfo', dem))
+            .set('areaINGoutline', areaINGoutline)
+            .set('areaIMGglacier', areaIMGglacier)
+            .set('arearatio', arearatio)
+            .set('SUN_AZIMUTH', sun_az)
+            .set('SUN_ELEVATION', sunEL)
+            .set('SENSOR', sens)
+            .set('hsboolean', hsboolean)
+            .set('deminfo', dem))
 
 
-def func_owr(img)  # create image collection:
-                  img1 = img.select(l5_bands).rename(l5_band_names);  # rename all images with the correct names
-                  img2 = img1  # .reproject('EPSG:32632',None, 30)
-                  return img2 \
-                .map(func_owr) \
-                .map(addquainfo) \
-                .filter(cloud_filter) \
-                .filter(coverage_filter) \
-                .map(addAlbedo)
+def scale_s2_pixels(image):
+    """
+    Scales the images from Sentinel sensor only to a ratio between 0 and 1
+    """
+
+    custom_bands = ['cb', 'blue', 'green', 'red', 're1', 're2',
+                    're3', 'nir', 're4', 'vapor', 'cirrus', 'swir1', 'swir2']
+
+    rescaled_image = image.select(custom_bands).divide(10000)
+    return image.addBands(srcImg=rescaled_image, overwrite=True)
 
 
-def func_xbh(img):
-                  img1 = img.select(l7_bands).rename(l7_band_names)
-                  img2 = img1  # .reproject('EPSG:32632',None, 30)
-                  return img2 \
-                  .map(func_xbh) \
-                .map(addquainfo) \
-                .filter(cloud_filter) \
-                .filter(coverage_filter) \
-                .map(addAlbedo)
+def remove_duplicates(image):
+    """
+    Filters out all duplicate images in an image collection.
+    """
 
-
-def func_tfu(img):
-                  img1 = img.select(l8_bands).rename(l8_band_names)
-                  img2 = img1  # .reproject('EPSG:32632',None, 30)
-                  return img2 \
-                .map(func_tfu) \
-                .map(addquainfo) \
-                .filter(cloud_filter) \
-                .filter(coverage_filter) \
-                .map(addAlbedo)
-
-
-sentineldata = s2.filterBounds(geometry) \
-                .filterDate(startdate, enddate).filter(ee.Filter.calendarRange(filterDOYstart, filterDOYend, 'day_of_year'))
-
-
-def func_ngk(img):
-                  img1 = img.select(s2_bands).rename(s2_band_names)
-                  img2 = img1  # .reproject('EPSG:32632',None, 30)
-                  return img2 \
-                .map(func_ngk) \
-                .map(saddquainfo) \
-                .filter(cloud_filter) \
-                .filter(coverage_filter)
-
-
-def func_jty(img):
-                  # scale the pixelvalues to a ratio between 0 and 1
-                  img1 = img \
-                    .select((['cb', 'blue', 'green', 'red', 're1', 're2', 're3', 'nir', 're4', 'vapor', 'cirrus', 'swir1', 'swir2'])) \
-                    .divide(10000)
-                  return img.addBands(img1, None, True) \
-                .map(func_jty
-).map(addAlbedo)
-
-
-).map(addAlbedo)
-
-
-###########   FILTER DUBLICATES WITH SAME DATE    #########################
-# sort all collection (for each sensor), that the dublicate filter works
-landsat5datapre=L5_FILTERED.sort('system:time_start')
-landsat7datapre=landsat7data.sort('system:time_start')
-landsat8datapre=landsat8data.sort('system:time_start')
-sentineldatapre=sentineldata.sort('system:time_start')
-# Function to detect dublicates
-def startdublicatfiltering(imgcollection):
-
-
-condition1=imgcollection.size()
-
-
-def normal():
-
-
-list=imgcollection.toList(imgcollection.size())
-image=ee.Image(list.get(0))
-dummyimage=ee.Image(1).set('system:time_start', 0)
-# Add in the end of the list a dummy image
-list=list.add(dummyimage)
-
-
-def detect_dublicates(image):
-  isdublicate=ee.String("")
-  number=list.indexOf(image)
-  image1=ee.Image(list.get(number.add(1)))
-  # Compare the image(0) in the ImageCollection with the image(1) in the List
-  date1=image.date().format("Y-M-d")
-  date2=image1.date().format("Y-M-d")
-  cond=ee.Algorithms.IsEqual(date1, date2)
-  isdublicate=ee.String(ee.Algorithms.If({'condition': cond,
-                  'TrueCase': "dublicate",
-                  'FalseCase': "no_dublicate"}))
-    return image.set({"status_dublicate": isdublicate})
-
-
-imgcoll_added=imgcollection.map(detect_dublicates)
-imgcollfiltered=imgcoll_added.filter(ee.Filter.eq("status_dublicate", "no_dublicate"))
-return imgcollfiltered
-
-
-def noimage():
-        #  Create Empty ImageCollection
-            emptyimgcol=ee.ImageCollection(ee.Image(5)).filter(ee.Filter.eq('system:index', 0))
-  return emptyimgcol
-
-
-ifNone=ee.Algorithms.If(condition1, normal(), noimage())
-return(ifNone)
-
-# merge does not wirk with at the moment! (find out, how an empty imagecollection can be merged)
-landsat5datafi=ee.ImageCollection(startdublicatfiltering(landsat5datapre))
-landsat7datafi=ee.ImageCollection(startdublicatfiltering(landsat7datapre))
-landsat8datafi=ee.ImageCollection(startdublicatfiltering(landsat8datapre))
-sentineldatafi=ee.ImageCollection(startdublicatfiltering(sentineldatapre))
-
-# Merge all individual collections per Sensor to one collection
-imagecol_all=landsat5datafi.merge(landsat7datafi).merge(landsat8datafi).merge(sentineldatafi)
-
-return imagecol_all
+    # TODO: FIND OUT LOGIC FOR THIS. ORIGINAL IMPLEMENTATION SEEMS AMBIGIOUS
+    return image
