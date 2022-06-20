@@ -5,8 +5,6 @@ from prep import PreProcessor
 
 if __name__ == "__main__":
 
-    ee.Initialize()
-
     ing_id = "G718255O411666S"
     start_year = ee.Number(2022)
     end_year = ee.Number(2022)
