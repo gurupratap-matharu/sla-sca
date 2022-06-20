@@ -272,7 +272,7 @@ class PreProcessor:
         # select not masked pixels
         img1 = img.select("green").neq(0)
         fc1 = img1.reduceToVectors(
-            {
+            **{
                 "reducer": ee.Reducer.countEvery(),
                 "geometry": self.geometry,
                 "scale": 30,
@@ -283,7 +283,7 @@ class PreProcessor:
         )
 
         area = fc1.reduceColumns(
-            {
+            **{
                 "reducer": ee.Reducer.sum(),
                 "selectors": ["count"],
             }
@@ -300,13 +300,15 @@ class PreProcessor:
         pixelarea = prep.multiply(ee.Image.pixelArea())
 
         return pixelarea.reduceRegion(
-            {
-                "reducer": ee.Reducer.sum(),
-                "geometry": self.geometry,
-                "scale": 30,
-                "bestEffort": True,
-                "maxPixels": 1e10,
-            }
+            ee.Dictionary(
+                {
+                    "reducer": ee.Reducer.sum(),
+                    "geometry": self.geometry,
+                    "scale": 30,
+                    "bestEffort": True,
+                    "maxPixels": 1e10,
+                }
+            )
         ).getNumber("green")
 
     def add_albedo(self, img):
