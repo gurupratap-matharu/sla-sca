@@ -6,12 +6,14 @@ The script exposes a high level function which does all the heavy lifting.
 
 The composite image is generated with this script and used in main code for further processing.
 """
+import json
 
 import ee
 
 ee.Initialize()
 
 
+FILENAME = "results.json"
 ING = ee.FeatureCollection(
     "users/lcsruiz/Mapping_seasonal_glacier_melt_across_the_ANDES_with_SAR/Glaciares_Arg_Andes_dissolve"
 )
@@ -497,4 +499,13 @@ if __name__ == "__main__":
         dem=dem,
     )
 
-    print(obj.execute())
+    print("executing...")
+    response = obj.execute()
+    print("getting info...")
+    response = response.getInfo()
+
+    with open(FILENAME, "w", encoding="utf-8") as f:
+        f.write(json.dumps(response))
+
+    print(f"Results written to {FILENAME}")
+    print("All done...!")
