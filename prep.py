@@ -326,15 +326,13 @@ class PreProcessor:
         pixelarea = prep.multiply(ee.Image.pixelArea())
 
         return pixelarea.reduceRegion(
-            ee.Dictionary(
-                {
-                    "reducer": ee.Reducer.sum(),
-                    "geometry": self.geometry,
-                    "scale": 30,
-                    "bestEffort": True,
-                    "maxPixels": 1e10,
-                }
-            )
+            **{
+                "reducer": ee.Reducer.sum(),
+                "geometry": self.geometry,
+                "scale": 30,
+                "bestEffort": True,
+                "maxPixels": 1e10,
+            }
         ).getNumber("green")
 
     def add_albedo(self, img):
@@ -384,6 +382,8 @@ class PreProcessor:
 
         # calculate the area for the image to detect, if there are parts without information
         area_rgi_outline = self.area_calc_rast(clip)  # TODO DO WE NEED THIS? ASK
+        # RGI:
+        # ING: inventario nacional de glaciares de Argentina
 
         # calculate ratio of coverage from one image over the glacier
         arearatio = area_rgi_outline.divide(self.area_glacier_IMG).multiply(100)
