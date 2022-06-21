@@ -20,22 +20,6 @@ L7 = ee.ImageCollection("LANDSAT/LE07/C01/T1_TOA")
 L8 = ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
 S2 = ee.ImageCollection("COPERNICUS/S2")
 
-"""
-Test data....
-
-ing_id = 'G718255O411666S'
-startyear =           ee.Number(2022) #
-endyear =             ee.Number(2022) # Año de fin del estudio
-filterDOYstart =      ee.Number(50)   # Start of Range: use DOY-Number to filter the range
-filterDOYend =        ee.Number(200)  # End of Range: DOY-Number to filter the range
-cloudiness =          ee.Number(50)   #% (Area over the Glacier that is not covered with Clouds)
-coverage =            50             #percentage of the glacier area, that has to be cove
-hsboolean = 0
-dem = 'SRTM'
-
-https://code.earthengine.google.com/?asset=users/lcsruiz/Mapping_seasonal_glacier_melt_across_the_ANDES_with_SAR/Glaciares_Arg_Andes_dissolve
-"""
-
 
 class PreProcessor:
     """
@@ -58,39 +42,37 @@ class PreProcessor:
         dem,
     ):
         self.ing_id = ing_id
-        self.start_year = start_year
-        self.end_year = end_year
-        self.cloudiness = cloudiness
-        self.coverage = coverage
-        self.doy_start = doy_start
-        self.doy_end = doy_end
+
+        self.start_date = ee.Date.fromYMD(start_year, 1, 1)
+        self.end_date = ee.Date.fromYMD(end_year, 12, 31)
+        self.calendar_filter = ee.Filter.calendarRange(
+            doy_start, doy_end, "day_of_year"
+        )
+
+        self.cloud_filter = ee.Filter.gt("noclouds", cloudiness)
+        self.coverage_filter = ee.Filter.gt("arearatio", coverage)
+
         self.hsboolean = hsboolean
         self.dem = dem
 
-        self.geometry = None
-        self.geometry_raw = None
-        self.geometry_buffered = None
-        self.area_glacier_IMG = None
-
-    def execute(self):
-        """
-        Main method to start preprocessing for all sensor data.
-        """
-
-        l5_bands = ee.List(["B1", "B2", "B3", "B4", "B5", "B6", "B7", "BQA"])
-        l5_band_names = ee.List(
+        self.l5_bands = ee.List(["B1", "B2", "B3", "B4", "B5", "B6", "B7", "BQA"])
+        self.l5_band_names = ee.List(
             ["blue", "green", "red", "nir", "swir1", "tir1", "swir2", "BQA"]
         )
 
-        l7_bands = ee.List(["B1", "B2", "B3", "B4", "B5", "B6_VCID_1", "B7", "BQA"])
-        l7_band_names = ee.List(
+        self.l7_bands = ee.List(
+            ["B1", "B2", "B3", "B4", "B5", "B6_VCID_1", "B7", "BQA"]
+        )
+
+        self.l7_band_names = ee.List(
             ["blue", "green", "red", "nir", "swir1", "tir1", "swir2", "BQA"]
         )
 
-        l8_bands = ee.List(
+        self.l8_bands = ee.List(
             ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B10", "B11", "BQA"]
         )
-        l8_band_names = ee.List(
+
+        self.l8_band_names = ee.List(
             [
                 "cb",
                 "blue",
@@ -105,7 +87,7 @@ class PreProcessor:
             ]
         )
 
-        s2_bands = ee.List(
+        self.s2_bands = ee.List(
             [
                 "B1",
                 "B2",
@@ -123,7 +105,8 @@ class PreProcessor:
                 "QA60",
             ]
         )
-        s2_band_names = ee.List(
+
+        self.s2_band_names = ee.List(
             [
                 "cb",
                 "blue",
@@ -142,14 +125,20 @@ class PreProcessor:
             ]
         )
 
-        start_date = ee.Date.fromYMD(self.start_year, 1, 1)
-        end_date = ee.Date.fromYMD(self.end_year, 12, 31)
-        calendar_filter = ee.Filter.calendarRange(
-            self.doy_start, self.doy_end, "day_of_year"
-        )
+        self.geometry = None
+        self.geometry_raw = None
+        self.geometry_buffered = None
+        self.area_glacier_IMG = None
 
-        cloud_filter = ee.Filter.gt("noclouds", self.cloudiness)
-        coverage_filter = ee.Filter.gt("arearatio", self.coverage)
+        self.l5_filtered = None
+        self.l7_filtered = None
+        self.l8_filtered = None
+        self.s2_filtered = None
+
+    def execute(self):
+        """
+        Main method to start preprocessing for all sensor data.
+        """
 
         self.geometry = ING.filterMetadata("ID_local", "equals", self.ing_id)
         self.geometry_raw = self.geometry.geometry()
@@ -163,61 +152,95 @@ class PreProcessor:
         # areatotal = self.geometry.first().get("Area")
         self.area_glacier_IMG = self.area_calc_rast(glacier_area)
 
-        l5_filtered = (
+        self.l5_filtered = self.filter_l5()
+        self.l7_filtered = self.filter_l7()
+        self.l8_filtered = self.filter_l8()
+        self.s2_filtered = self.filter_s2()
+
+        collection = (
+            self.l5_filtered.merge(self.l7_filtered)
+            .merge(self.l8_filtered)
+            .merge(self.s2_filtered)
+        )
+
+        collection = collection.map(self.remove_duplicates)
+
+        return collection
+
+    def filter_l5(self):
+        """
+        Filter L5 sensor data based on date and geometry and applies various filters
+        like cloud and coverage.
+        """
+
+        return (
             L5.filterBounds(self.geometry)
-            .filterDate(start_date, end_date)
-            .filter(calendar_filter)
-            .map(lambda image: image.select(l5_bands).rename(l5_band_names))
+            .filterDate(self.start_date, self.end_date)
+            .filter(self.calendar_filter)
+            .map(lambda image: image.select(self.l5_bands).rename(self.l5_band_names))
             .map(self.add_quality_info)
-            .filter(cloud_filter)
-            .filter(coverage_filter)
+            .filter(self.cloud_filter)
+            .filter(self.coverage_filter)
             .map(self.add_albedo)
             .sort("system:time_start")
         )
 
-        l7_filtered = (
+    def filter_l7(self):
+        """
+
+        Filter L7 sensor data based on date and geometry and applies various filters
+        like cloud and coverage.
+        """
+
+        return (
             L7.filterBounds(self.geometry)
-            .filterDate(start_date, end_date)
-            .filter(calendar_filter)
-            .map(lambda image: image.select(l7_bands).rename(l7_band_names))
+            .filterDate(self.start_date, self.end_date)
+            .filter(self.calendar_filter)
+            .map(lambda image: image.select(self.l7_bands).rename(self.l7_band_names))
             .map(self.add_quality_info)
-            .filter(cloud_filter)
-            .filter(coverage_filter)
+            .filter(self.cloud_filter)
+            .filter(self.coverage_filter)
             .map(self.add_albedo)
             .sort("system:time_start")
         )
 
-        l8_filtered = (
+    def filter_l8(self):
+        """
+
+        Filter L5 sensor data based on date and geometry and applies various filters
+        like cloud and coverage.
+        """
+
+        return (
             L8.filterBounds(self.geometry)
-            .filterDate(start_date, end_date)
-            .filter(calendar_filter)
-            .map(lambda image: image.select(l8_bands).rename(l8_band_names))
+            .filterDate(self.start_date, self.end_date)
+            .filter(self.calendar_filter)
+            .map(lambda image: image.select(self.l8_bands).rename(self.l8_band_names))
             .map(self.add_quality_info)
-            .filter(cloud_filter)
-            .filter(coverage_filter)
+            .filter(self.cloud_filter)
+            .filter(self.coverage_filter)
             .map(self.add_albedo)
             .sort("system:time_start")
         )
 
-        s2_filtered = (
+    def filter_s2(self):
+        """
+        Filter S2 sensor data based on date and geometry and applies various filters
+        like cloud and coverage.
+        """
+
+        return (
             S2.filterBounds(self.geometry)
-            .filterDate(start_date, end_date)
-            .filter(calendar_filter)
-            .map(lambda image: image.select(s2_bands).rename(s2_band_names))
+            .filterDate(self.start_date, self.end_date)
+            .filter(self.calendar_filter)
+            .map(lambda image: image.select(self.s2_bands).rename(self.s2_band_names))
             .map(self.sentinel_add_quality_info)
-            .filter(cloud_filter)
-            .filter(coverage_filter)
+            .filter(self.cloud_filter)
+            .filter(self.coverage_filter)
             .map(self.scale_s2_pixels)
             .map(self.add_albedo)
             .sort("system:time_start")
         )
-
-        collection = (
-            l5_filtered.merge(l7_filtered).merge(l8_filtered).merge(s2_filtered)
-        )
-        collection = collection.map(self.remove_duplicates)
-
-        return collection
 
     def rescale(self, img, exp, thresholds):
         """
@@ -474,5 +497,4 @@ if __name__ == "__main__":
         dem=dem,
     )
 
-    res = obj.execute()
-    print(res)
+    print(obj.execute())
