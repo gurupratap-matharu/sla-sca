@@ -1,8 +1,6 @@
 [tool.isort]
 profile = 'black'
 
-[tool.pylint.format]
-max-line-length = "88"
 [tool.poetry]
 name = "sla-sca"
 version = "0.1.0"
@@ -11,6 +9,7 @@ authors = ["Gurupratap Matharu <gurupratap.matharu@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+earthengine-api = "^0.1.316"
 
 [tool.poetry.dev-dependencies]
 black = "^22.6.0"
