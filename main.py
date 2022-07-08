@@ -1,31 +1,44 @@
 import ee
 
 ee.Initialize()
+import logging
+
+from cloud_shadow_mask import add_cloud_shadow
 from prep import PreProcessor
 
-if __name__ == "__main__":
+logger = logging.getLogger(__name__)
 
-    ing_id = "G718255O411666S"
-    start_year = ee.Number(2022)
-    end_year = ee.Number(2022)
-    doy_start = ee.Number(50)
-    doy_end = ee.Number(200)
-    cloudiness = ee.Number(50)
-    coverage = 50
-    hsboolean = 0
-    dem = "SRTM"
 
-    obj = PreProcessor(
-        ing_id=ing_id,
-        start_year=start_year,
-        end_year=end_year,
-        doy_start=doy_start,
-        doy_end=doy_end,
-        cloudiness=cloudiness,
-        coverage=coverage,
-        hsboolean=hsboolean,
-        dem=dem,
-    )
+ing_id = "G718255O411666S"
+start_year = ee.Number(2022)
+end_year = ee.Number(2022)
+doy_start = ee.Number(50)
+doy_end = ee.Number(200)
+cloudiness = ee.Number(50)
+coverage = 50
+hsboolean = 0
+dem = "SRTM"
 
-    res = obj.execute()
-    print(res)
+
+preprocessor = PreProcessor(
+    ing_id=ing_id,
+    start_year=start_year,
+    end_year=end_year,
+    doy_start=doy_start,
+    doy_end=doy_end,
+    cloudiness=cloudiness,
+    coverage=coverage,
+    hsboolean=hsboolean,
+    dem=dem,
+)
+
+print("preprocessing...")
+preprocessed = preprocessor.execute()
+preprocessed = preprocessed.filterMetadata(
+    "system:time_start", "not_equals", 1443176819706
+)
+
+preprocessed_with_cloud_shadows = preprocessed.map(add_cloud_shadow)
+
+
+print("All Done...!")
