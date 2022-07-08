@@ -1,4 +1,0 @@
-black
-geemap
-isort
-pylint
