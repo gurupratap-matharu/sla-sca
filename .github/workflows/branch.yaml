@@ -1,0 +1,57 @@
+name: ci
+on: [push]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9"]
+        poetry-version: ["1.1.13"]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: run image
+        uses: abatilo/actions-poetry@v2.1.4
+        with:
+          poetry-version: ${{ matrix.poetry-version }}
+      - name: install dependencies
+        run: poetry install
+      # - name: run tests
+      #   run: poetry run pytest --cov=./ --cov-report=xml
+      # - name: upload coverage to codecov
+      #   uses: codecov/codecov-action@v2
+
+  code-quality:
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9"]
+        poetry-version: ["1.1.13"]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: run image
+        uses: abatilo/actions-poetry@v2.1.4
+        with:
+          poetry-version: ${{ matrix.poetry-version }}
+      - name: install dependencies
+        run: poetry install
+      - name: run black
+        run: poetry run black . --check
+      - name: run isort
+        run: poetry run isort . --check-only --profile black
+      - name: run flake8
+        run: poetry run flake8 .
+      - name: run bandit
+        run: poetry run bandit .
+      - name: run safety
+        run: poetry run safety check
