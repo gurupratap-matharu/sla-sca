@@ -83,10 +83,10 @@ def add_cloud_shadow(image):
 
     # Mask the cloud score
     cloud_mask = cloud_score.gt(cloud_threshold).focal_min(contract_pixels).focal_max(dilate_pixels)
-    CloudMasked  = image.updateMask(cloud_mask.not()) # TODO check this.... is this needed?
+    # CloudMasked  = image.updateMask(cloud_mask.not()) # TODO check this.... is this needed?
 
     # Projecting the cloud shadow
-    cloud_shadow_masked = project_shadows(image, cloud_mask, cloud_heights, infrared_threshold)
+    cloud_shadow_masked = project_shadows(image, cloud_mask, cloud_heights, contract_pixels, dilate_pixels, infrared_threshold)
     return cloud_shadow_masked.clip(geometry)
 
 
