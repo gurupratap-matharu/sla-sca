@@ -1,5 +1,6 @@
 [tool.isort]
 profile = 'black'
+skip = ['docs']
 
 [tool.poetry]
 name = "sla-sca"
@@ -10,6 +11,7 @@ authors = ["Gurupratap Matharu <gurupratap.matharu@gmail.com>"]
 [tool.poetry.dependencies]
 python = "^3.10"
 earthengine-api = "^0.1.316"
+ipython = "^8.4.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.6.0"
