@@ -1,3 +1,5 @@
+import json
+
 import ee
 
 ee.Initialize()
@@ -37,8 +39,17 @@ preprocessed = preprocessor.execute()
 preprocessed = preprocessed.filterMetadata(
     "system:time_start", "not_equals", 1443176819706
 )
-
+print("processing cloud shadowj mask...")
 preprocessed_with_cloud_shadows = preprocessed.map(add_cloud_shadow)
 
+
+# Write to local file
+response = preprocessed_with_cloud_shadows.getInfo()
+FILENAME = "cloud_shadow_masked.json"
+
+with open(FILENAME, "w", encoding="utf-8") as f:
+    f.write(json.dumps(response))
+
+    print(f"Results written to {FILENAME}")
 
 print("All Done...!")
