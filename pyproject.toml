@@ -14,6 +14,7 @@ earthengine-api = "^0.1.316"
 ipython = "^8.4.0"
 black = "^22.6.0"
 typing-extensions = "^4.3.0"
+geemap = "^0.15.4"
 
 [tool.poetry.dev-dependencies]
 black = "^22.6.0"
