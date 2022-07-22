@@ -44,9 +44,6 @@ def add_cloud_score(img):
 def project_shadows(
     image, cloud_mask, cloud_heights, contract_pixels, dilate_pixels, infrared_threshold
 ):
-    def find_shadow(img):
-        # TODO
-        return img
 
     right_angle = ee.Number(90)
     sun_elevation = image.get("SUN_ELEVATION")
@@ -76,12 +73,40 @@ def project_shadows(
         .subtract(ee.Number(mean_zenith).multiply(math.pi).divide(180.0))
     )
 
+    def find_shadow(cloud_height):
+        cloud_height = ee.Number(cloud_height)
+        shadow_casted_distance = zenith_radians.tan().multiply(cloud_height)
+
+        x_distance = (
+            azimuth_radians.cos()
+            .multiply(shadow_casted_distance)
+            .divide(nominal_scale)
+            .round()
+        )
+
+        y_distance = (
+            azimuth_radians.sin()
+            .multiply(shadow_casted_distance)
+            .divide(nominal_scale)
+            .round()
+        )
+
+        return cloud_mask.changeProj(
+            cloud_mask.projection(),
+            cloud_mask.projection().translate(x_distance, y_distance),
+        )
+
     # Find the shadows
     shadows = cloud_heights.map(find_shadow)
-    shadow_mask = ee.ImageCollection.fromImages(shadows).max()
-    # shadow_mask = shadow_mask.and(cloud_mask.not())
-    # shadow_mask = shadow_mask.focal_min(contract_pixels).focal_max(dilate_pixels)
-    # shadow_mask = shadow_mask.and(dark_pixels)
+
+    shadow_mask = (
+        ee.ImageCollection.fromImages(shadows)
+        .max()
+        .And(cloud_mask.Not())
+        .focal_min(contract_pixels)
+        .focal_max(dilate_pixels)
+        .And(dark_pixels)
+    )
 
     image = image.addBands(shadow_mask.rename(["cloudShadow"]))
 
@@ -107,9 +132,11 @@ def add_cloud_shadow(image):
         .focal_min(contract_pixels)
         .focal_max(dilate_pixels)
     )
-    # CloudMasked  = image.updateMask(cloud_mask.not()) # TODO check this.... is this needed?
 
-    # Projecting the cloud shadow
+    cloud_masked = image.updateMask(
+        cloud_mask.Not()
+    )  # TODO check this.... is this needed?
+
     cloud_shadow_masked = project_shadows(
         image,
         cloud_mask,
@@ -118,6 +145,7 @@ def add_cloud_shadow(image):
         dilate_pixels,
         infrared_threshold,
     )
+
     return cloud_shadow_masked.clip(geometry)
 
 
