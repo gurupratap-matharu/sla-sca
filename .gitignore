@@ -2,7 +2,8 @@
 .vscode
 
 # local files
-results.json
+*.json
+dump/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
