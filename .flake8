@@ -1,3 +1,11 @@
 [flake8]
+max-line-length = 120
+max-complexity = 10
 exclude =
     docs/conf.py,
+    .git,
+    __pycache__,
+    docs/source/conf.py,
+    old,
+    build,
+    dist
