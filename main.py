@@ -1,14 +1,29 @@
 import json
+import logging
 
 import ee
 
 ee.Initialize()
-import logging
 
-from cloud_shadow_mask import add_cloud_shadow
-from prep import PreProcessor
+from cloud_shadow_mask import add_cloud_shadow  # noqa
+from prep import PreProcessor  # noqa
 
 logger = logging.getLogger(__name__)
+
+
+def write_to_local(response, filename):
+    """
+    Writes a GEE object to the local filesystem in JSON format.
+
+    Be cautious as this method will call the getInfo() method on the GEE object to
+    retrieve all the results from the EE server. So it can be computationally expensive
+    and block all further execution.
+    """
+
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(json.dumps(response.getInfo()))
+
+    print(f"Results written to {filename}")
 
 
 ing_id = "G718255O411666S"
@@ -39,17 +54,12 @@ preprocessed = preprocessor.execute()
 preprocessed = preprocessed.filterMetadata(
     "system:time_start", "not_equals", 1443176819706
 )
-print("processing cloud shadowj mask...")
+print("processing cloud shadow mask...")
 preprocessed_with_cloud_shadows = preprocessed.map(add_cloud_shadow)
 
 
-# Write to local file
-response = preprocessed_with_cloud_shadows.getInfo()
-FILENAME = "cloud_shadow_masked.json"
-
-with open(FILENAME, "w", encoding="utf-8") as f:
-    f.write(json.dumps(response))
-
-    print(f"Results written to {FILENAME}")
+write_to_local(
+    response=preprocessed_with_cloud_shadows, filename="dump/cloud_shadow.json"
+)
 
 print("All Done...!")
