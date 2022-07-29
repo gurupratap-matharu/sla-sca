@@ -9,7 +9,7 @@ description = "Snow Line Altitude (SLA) monitoring for glaciers in Argentina."
 authors = ["Gurupratap Matharu <gurupratap.matharu@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.9"
 earthengine-api = "^0.1.316"
 ipython = "^8.4.0"
 black = "^22.6.0"
