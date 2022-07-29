@@ -20,7 +20,7 @@ def add_hill_shadow(image_collection, hs_start=HS_START, hs_end=HS_END):
         lambda img: img.set("hsboolean", 0)
     )
 
-    # Merge the two parts and sort them in ascending order starting with start of the year
+    # Merge the two parts and sort them in ascending order
 
     prep_final = ee.ImageCollection(
         img_coll_hsn.merge(img_coll_hsy).sort("system:time_start")

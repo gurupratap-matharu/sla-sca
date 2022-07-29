@@ -53,7 +53,7 @@ def project_shadows(
     # Find dark pixels in the image
     dark_pixels = (
         image.select(["nir", "swir1", "swir2"])
-        .reduce(ee.Reducer.sum())
+        .reduce(ee.Reducer.sum())  # type: ignore
         .lt(infrared_threshold)
     )
 
