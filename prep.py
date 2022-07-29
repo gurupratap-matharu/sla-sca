@@ -13,7 +13,7 @@ import ee
 ee.Initialize()
 
 
-FILENAME = "results.json"
+FILENAME = "dump/prep.json"
 ING = ee.FeatureCollection(
     "users/lcsruiz/Mapping_seasonal_glacier_melt_across_the_ANDES_with_SAR/Glaciares_Arg_Andes_dissolve"
 )
