@@ -1,14 +1,18 @@
 import json
 import logging
+import time
 
 import ee
 
 ee.Initialize()
 
 from cloud_shadow_mask import add_cloud_shadow  # noqa
+from hill_shadow import add_hill_shadow  # noqa
 from prep import PreProcessor  # noqa
 
 logger = logging.getLogger(__name__)
+
+start = time.time()
 
 
 def write_to_local(response, filename):
@@ -55,11 +59,14 @@ preprocessed = preprocessed.filterMetadata(
     "system:time_start", "not_equals", 1443176819706
 )
 print("processing cloud shadow mask...")
-preprocessed_with_cloud_shadows = preprocessed.map(add_cloud_shadow)
+preprocessed = preprocessed.map(add_cloud_shadow)
+
+print("processing hill shadow...")
+preprocessed = add_hill_shadow(image_collection=preprocessed)
 
 
-write_to_local(
-    response=preprocessed_with_cloud_shadows, filename="dump/cloud_shadow.json"
-)
+write_to_local(response=preprocessed, filename="dump/hill_shadow.json")
 
+end = time.time()
 print("All Done...!")
+print(f"It took {end-start:.2f} seconds")
