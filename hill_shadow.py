@@ -1,7 +1,7 @@
 import ee
 
-HS_START = ee.Number(1)
-HS_END = ee.Number(2)
+HS_START = ee.Number(90)
+HS_END = ee.Number(100)
 
 
 def add_hill_shadow(image_collection, hs_start=HS_START, hs_end=HS_END):
