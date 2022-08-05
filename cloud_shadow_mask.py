@@ -133,9 +133,7 @@ def add_cloud_shadow(image):
         .focal_max(dilate_pixels)
     )
 
-    cloud_masked = image.updateMask(
-        cloud_mask.Not()
-    )  # TODO check this.... is this needed?
+    image.updateMask(cloud_mask.Not())
 
     cloud_shadow_masked = project_shadows(
         image,
