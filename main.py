@@ -6,6 +6,7 @@ import ee
 
 ee.Initialize()
 
+from classifier import decision_tree  # noqa
 from cloud_shadow_mask import add_cloud_shadow  # noqa
 from hill_shadow import add_hill_shadow  # noqa
 from prep import PreProcessor  # noqa
@@ -65,7 +66,13 @@ preprocessed = preprocessed.map(add_cloud_shadow)
 print("processing hill shadow...")
 preprocessed = add_hill_shadow(image_collection=preprocessed)
 
-write_to_local(response=preprocessed, filename="dump/hill_shadow.json")
+
+print("Number of available images:", preprocessed.size())
+
+print("initiating classifier...")
+map_collection = preprocessed.map(decision_tree)
+
+write_to_local(response=map_collection, filename="dump/map_collection.json")
 
 end = time.time()
 print("All Done...!")
