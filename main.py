@@ -6,14 +6,16 @@ import ee
 
 ee.Initialize()
 
-from classifier import decision_tree  # noqa
-from cloud_shadow_mask import add_cloud_shadow  # noqa
-from hill_shadow import add_hill_shadow  # noqa
-from prep import PreProcessor  # noqa
+from sla.classifier import decision_tree  # noqa
+from sla.cloud_shadow_mask import add_cloud_shadow  # noqa
+from sla.hill_shadow import add_hill_shadow  # noqa
+from sla.prep import PreProcessor  # noqa
 
 logger = logging.getLogger(__name__)
 
 start = time.time()
+
+print("starting...")
 
 
 def write_to_local(response, filename):
@@ -65,9 +67,6 @@ preprocessed = preprocessed.map(add_cloud_shadow)
 
 print("processing hill shadow...")
 preprocessed = add_hill_shadow(image_collection=preprocessed)
-
-
-print("Number of available images:", preprocessed.size())
 
 print("initiating classifier...")
 map_collection = preprocessed.map(decision_tree)
