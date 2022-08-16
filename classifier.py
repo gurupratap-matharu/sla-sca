@@ -1,3 +1,5 @@
+import imghdr
+
 import ee
 
 ALOS = ee.Image("JAXA/ALOS/AW3D30/V2_2")
@@ -5,6 +7,14 @@ SRTM = ee.Image("USGS/SRTMGL1_003")
 ING = ee.FeatureCollection(
     "users/lcsruiz/Mapping_seasonal_glacier_melt_across_the_ANDES_with_SAR/Glaciares_Arg_Andes_dissolve"
 )
+
+
+def hill_shadow_yes():
+    pass
+
+
+def hill_shadow_no():
+    pass
 
 
 def decision_tree(image):
@@ -48,5 +58,13 @@ def decision_tree(image):
 
     image2 = image.addBands(ndsi)
     image3 = image2.addBands(ndwi)
+
+    add_hill_shadow = ee.Algorithms.If(
+        hsboolean, hill_shadow_yes(), hill_shadow_no()
+    )  # check if these functions should be called here or only referred
+
+    image4 = ee.Image(add_hill_shadow)
+    system_time = ee.Number(image.get("system:time_start"))
+    hill_shadow_mask = image4.select("shadow").eq(0).clip(geometry)
 
     return image
