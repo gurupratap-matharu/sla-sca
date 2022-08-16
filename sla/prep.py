@@ -167,6 +167,10 @@ class PreProcessor:
 
         collection = collection.map(self.remove_duplicates)
 
+        collection = collection.filterMetadata(
+            "system:time_start", "not_equals", 1443176819706
+        )
+
         return collection
 
     def filter_l5(self):

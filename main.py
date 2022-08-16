@@ -58,12 +58,9 @@ preprocessor = PreProcessor(
 
 print("preprocessing...")
 preprocessed = preprocessor.execute()
-preprocessed = preprocessed.filterMetadata(
-    "system:time_start", "not_equals", 1443176819706
-)
+
 print("processing cloud shadow mask...")
 preprocessed = preprocessed.map(add_cloud_shadow)
-
 
 print("processing hill shadow...")
 preprocessed = add_hill_shadow(image_collection=preprocessed)
@@ -71,7 +68,7 @@ preprocessed = add_hill_shadow(image_collection=preprocessed)
 print("initiating classifier...")
 map_collection = preprocessed.map(decision_tree)
 
-write_to_local(response=map_collection, filename="dump/map_collection.json")
+# write_to_local(response=map_collection, filename="dump/map_collection.json")
 
 end = time.time()
 print("All Done...!")
