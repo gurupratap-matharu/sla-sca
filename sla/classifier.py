@@ -231,8 +231,8 @@ def decision_tree(image):
         }
     )
 
-    hist = histogram.get("nir_histogram").divide(10000)
-    nir_threshold = otsu(hist=hist)
+    hist = histogram.get("nir_histogram")
+    nir_threshold = otsu(hist=hist).divide(10000)
 
     # Check whether the nir_threshold is too low or too high
     low, high = nir_threshold.gt(0.41), nir_threshold.lt(0.54)
@@ -253,7 +253,9 @@ def decision_tree(image):
 
     score = ee.Image(1.0)
 
-    score = score.min(rescale(ice_snow_diff, "img.red + img.gree + img.blue", [0.5, 2]))
+    score = score.min(
+        rescale(ice_snow_diff, "img.red + img.green + img.blue", [0.5, 2])
+    )
 
     ice = (
         start.mask(score.select("constant").lt(0.7))
