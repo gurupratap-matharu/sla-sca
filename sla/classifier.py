@@ -1,5 +1,4 @@
 import ee
-from numpy import histogram
 
 ALOS = ee.Image("JAXA/ALOS/AW3D30/V2_2")
 SRTM = ee.Image("USGS/SRTMGL1_003")
@@ -168,9 +167,19 @@ def decision_tree(image):
     snow_shadow_mask = score.select("constant").gt(0.8)
     unknown_shadow_mask = score.select("constant").lt(0.8)
 
-    snow_shadow = shadows.mask(snow_shadow_mask).select("classification").multiply(6)
+    snow_shadow = (
+        shadows.mask(snow_shadow_mask)
+        .select("classification")
+        .multiply(6)
+        .unmask(-1)
+        .clip(geometry)
+    )
     unknown_shadow = (
-        shadows.mask(unknown_shadow_mask).select("classification").multiply(8)
+        shadows.mask(unknown_shadow_mask)
+        .select("classification")
+        .multiply(8)
+        .unmask(-1)
+        .clip(geometry)
     )
 
     # Prepare an image without shaded area (shadow is masked)
@@ -189,14 +198,14 @@ def decision_tree(image):
         start.mask(water_class.select("blue").gt(0.1))
         .select("classification")
         .multiply(8)
-        .unmask(-1)
+        .unmask(-1)  # Mask everything else with minus 1 (not a class)
     )
 
     water = (
         start.mask(water_class.select("blue").lt(0.1))
         .select("classification")
         .multiply(2)
-        .unmask(-1)
+        .unmask(-1)  # Mask everything else with minus 1 (not a class)
     )
 
     image_5 = image_4.mask(not_water_mask)
@@ -225,12 +234,82 @@ def decision_tree(image):
     hist = histogram.get("nir_histogram").divide(10000)
     nir_threshold = otsu(hist=hist)
 
+    # Check whether the nir_threshold is too low or too high
     low, high = nir_threshold.gt(0.41), nir_threshold.lt(0.54)
 
-    otsu_check = low.add(high)
+    is_otsu_high = low.add(high).gt(1)
+
+    fixed_threshold = 0.47  # TODO check if this should be an ee.Number
+
+    threshold = ee.Number(
+        ee.Algorithms.If(is_otsu_high, nir_threshold, fixed_threshold)
+    )
 
     # Mask Snow and Ice
-    snow_mask = image_6.select("nir").gt(ee.Number(threshold))
-    ice_mask = image_6.select('nir').lt(ee.Number(threshold))
+    snow_mask = image_6.select("nir").gt(threshold)
     snow = start.mask(snow_mask).select("classification").multiply(1).unmask(-1)
-    return image
+
+    ice_snow_diff = start.mask(image_6.select("nir").lt(threshold))
+
+    score = ee.Image(1.0)
+
+    score = score.min(rescale(ice_snow_diff, "img.red + img.gree + img.blue", [0.5, 2]))
+
+    ice = (
+        start.mask(score.select("constant").lt(0.7))
+        .select("classification")
+        .multiply(0)
+        .unmask(1)
+    )
+
+    # Mask Cloud and Debris cover
+
+    image_7 = image_5.mask(cloud_debris)
+    cloud = (
+        start.mask(image_7.select("red").gt(0.6))
+        .select("classification")
+        .multiply(4)
+        .unmask(-1)
+    )
+
+    debris = (
+        start.mask(image_7.select("red").lt(0.3))
+        .select("classification")
+        .multiply(3)
+        .unmask(-1)
+    )
+
+    # Reprojection of all Masks
+
+    water_reprojected = water.reproject(crs_transform)
+    cloud_reprojected = cloud.reproject(crs_transform)
+    debris_reprojected = debris.reproject(crs_transform)
+    snow_reprojected = snow.reproject(crs_transform)
+    ice_reprojected = ice.reproject(crs_transform)
+
+    shadow_reprojected = shadow.reproject(crs_transform)
+    snow_shadow_reprojected = snow_shadow.reproject(crs_transform)
+    unknown_shadow_reprojected = unknown_shadow.reproject(crs_transform)
+
+    # Create one single image with all masks
+
+    classify = (
+        water_reprojected.max(cloud_reprojected)
+        .max(debris_reprojected)
+        .max(snow_reprojected)
+        .max(ice_reprojected)
+        .max(shadow_reprojected)
+        .max(snow_shadow_reprojected)
+        .max(unknown_shadow_reprojected)
+    ).clip(geometry)
+
+    classified = (
+        classify.set("system_time_start", system_time)
+        .set("ING_ID", ing_id)
+        .set("otsu", threshold)
+        .set("deminfo", dem_info)
+        .clip(geometry)
+        .mask(image.select("blue").gte(0))
+    )
+
+    return classified
