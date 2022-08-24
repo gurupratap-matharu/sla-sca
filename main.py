@@ -65,7 +65,7 @@ preprocessed = preprocessed.map(add_cloud_shadow)
 print("processing hill shadow...")
 preprocessed = add_hill_shadow(image_collection=preprocessed)
 
-write_to_local(response=preprocessed, filename="dump/hill_shadow.json")
+# write_to_local(response=preprocessed, filename="dump/hill_shadow.json")
 
 print("initiating classifier...")
 map_collection = preprocessed.map(decision_tree)
