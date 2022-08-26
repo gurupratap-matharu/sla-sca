@@ -70,7 +70,7 @@ print("initiating classifier...")
 map_collection = preprocessed.map(decision_tree)
 
 print("writing to local...")
-write_to_local(response=preprocessed, filename="dump/classified.json")
+write_to_local(response=map_collection, filename="dump/classified.json")
 
 end = time.time()
 print("All Done...!")
