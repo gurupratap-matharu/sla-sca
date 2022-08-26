@@ -1,6 +1,5 @@
 import ee
 
-ALOS = ee.Image("JAXA/ALOS/AW3D30/V2_2")
 SRTM = ee.Image("USGS/SRTMGL1_003")
 ING = ee.FeatureCollection(
     "users/lcsruiz/Mapping_seasonal_glacier_melt_across_the_ANDES_with_SAR/Glaciares_Arg_Andes_dissolve"
@@ -115,16 +114,7 @@ def decision_tree(image):
     geometry_buffered = geometry_raw.buffer(2500, 5)
 
     # DEM selection
-    dem_1 = SRTM.select("elevation").rename("AVE_DSM").clip(geometry)
-    # dem_2 = ALOS.select("AVE_DSM").clip(geometry)
-
-    # Check if dem selection == 'ALOS'
-    # dem_selector = ee.Algorithms.IsEqual(ee.String(dem_info), ee.String("ALOS"))
-
-    # Conditionally select the DEM to be used
-    # TODO CHECK this.. We should avoid If statements!
-    # dem_glacier = ee.Image(ee.Algorithms.If(dem_selector, dem_2, dem_1))
-    dem_glacier = dem_1
+    dem_glacier = SRTM.select("elevation").rename("AVE_DSM").clip(geometry)
 
     elevation = dem_glacier.clip(geometry_buffered)
 
@@ -221,7 +211,6 @@ def decision_tree(image):
 
     otsu_image = image_6.clip(geometry).select("nir").multiply(10000)
 
-    # TODO check this histogram implementation of passing dict
     histogram = otsu_image.reduceRegion(
         **{
             "reducer": ee.Reducer.histogram(50, 2).combine("mean", None, True),  # type: ignore
@@ -239,7 +228,7 @@ def decision_tree(image):
 
     is_otsu_high = low.add(high).gt(1)
 
-    fixed_threshold = 0.47  # TODO check if this should be an ee.Number
+    fixed_threshold = 0.47
 
     threshold = ee.Number(
         ee.Algorithms.If(is_otsu_high, nir_threshold, fixed_threshold)
