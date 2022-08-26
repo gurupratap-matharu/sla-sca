@@ -18,12 +18,12 @@ def otsu(hist):
         """
 
         a_counts = counts.slice(0, 0, index)
-        a_count = a_counts.reduce(ee.Reducer.sum(), [0]).get([0])
+        a_count = a_counts.reduce(ee.Reducer.sum(), [0]).get([0])  # type: ignore
 
         a_means = means.slice(0, 0, index)
         a_mean = (
             a_means.multiply(a_counts)
-            .reduce(ee.Reducer.sum(), [0])
+            .reduce(ee.Reducer.sum(), [0])  # type: ignore
             .get([0])
             .divide(a_count)
         )
@@ -35,11 +35,11 @@ def otsu(hist):
             b_count.multiply(b_mean.subtract(mean).pow(2))
         )
 
-    counts = ee.Array(ee.Dictionary(hist).get("histogram"))
-    means = ee.Array(ee.Dictionary(hist).get("bucketMeans"))
+    counts = ee.Array(ee.Dictionary(hist).get("histogram"))  # type: ignore
+    means = ee.Array(ee.Dictionary(hist).get("bucketMeans"))  # type: ignore
     size = means.length().get([0])
-    total = counts.reduce(ee.Reducer.sum(), [0]).get([0])
-    sum = means.multiply(counts).reduce(ee.Reducer.sum(), [0]).get([0])
+    total = counts.reduce(ee.Reducer.sum(), [0]).get([0])  # type: ignore
+    sum = means.multiply(counts).reduce(ee.Reducer.sum(), [0]).get([0])  # type: ignore
     mean = sum.divide(total)
     indices = ee.List.sequence(1, size)
 
@@ -71,7 +71,7 @@ def add_true_hill_shadow(img, elevation, crs_transform):
     sun_azimuth = img.get("SUN_AZIMUTH")
     zenith = right_angle.subtract(sun_elevation)
     shadow_map = (
-        ee.Terrain.hillShadow(elevation, sun_azimuth, zenith, 200, True)
+        ee.Terrain.hillShadow(elevation, sun_azimuth, zenith, 200, True)  # type: ignore
         .focal_min(4)
         .reproject(crs_transform)
     )
@@ -116,10 +116,10 @@ def decision_tree(image):
 
     # DEM selection
     dem_1 = SRTM.select("elevation").rename("AVE_DSM").clip(geometry)
-    dem_2 = ALOS.select("AVE_DSM").clip(geometry)
+    # dem_2 = ALOS.select("AVE_DSM").clip(geometry)
 
     # Check if dem selection == 'ALOS'
-    dem_selector = ee.Algorithms.IsEqual(ee.String(dem_info), ee.String("ALOS"))
+    # dem_selector = ee.Algorithms.IsEqual(ee.String(dem_info), ee.String("ALOS"))
 
     # Conditionally select the DEM to be used
     # TODO CHECK this.. We should avoid If statements!
@@ -224,7 +224,7 @@ def decision_tree(image):
     # TODO check this histogram implementation of passing dict
     histogram = otsu_image.reduceRegion(
         **{
-            "reducer": ee.Reducer.histogram(50, 2).combine("mean", None, True),
+            "reducer": ee.Reducer.histogram(50, 2).combine("mean", None, True),  # type: ignore
             "geometry": geometry,
             "scale": 30,
             "bestEffort": True,
