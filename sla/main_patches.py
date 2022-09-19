@@ -16,9 +16,8 @@ def extract_sla_patch(image):
         """
 
         # Take a band (elevation in this case) to calculate the area
-        prep = img.select("AVE_DSM")
-        pixel_area = prep.multiply(ee.Image.pixelArea())
-        pixel_area_reduced = pixel_area.reduceRegion(
+        pixel_area = img.select("AVE_DSM").multiply(ee.Image.pixelArea())
+        return pixel_area.reduceRegion(
             **{
                 "reducer": ee.Reducer.sum(),  # type: ignore
                 "geometry": geometry,
@@ -26,9 +25,7 @@ def extract_sla_patch(image):
                 "maxPixels": 1e8,
                 "bestEffort": True,
             }
-        )
-
-        return pixel_area_reduced.getNumber("AVE_DSM")
+        ).getNumber("AVE_DSM")
 
     glims_id = image.get("GLIMS_ID")
     otsu = image.get("otsu")
@@ -43,10 +40,10 @@ def extract_sla_patch(image):
 
     dem_selector = ee.Algorithms.IsEqual(ee.String(dem_info), ee.String("ALOS"))
     dem_glacier = ee.Image(ee.Algorithms.If(dem_selector, dem_2, dem_1))
-    classified = image
 
     # Combine classes from classified image
 
+    classified = image
     dcmask = classified.select("classification").neq(-1)  # Unclassified
     mask1 = classified.select("classification").neq(7)  # All but shadow on water
     mask2 = classified.select("classification").neq(4)  # All but clouds
@@ -54,12 +51,20 @@ def extract_sla_patch(image):
     mask4 = classified.select("classification").neq(2)  # All but water
     mask5 = classified.select("classification").neq(8)
 
-    classmask1 = classified.mask(dcmask).clip(geometry)
-    classmask2 = classmask1.updateMask(mask1).clip(geometry)
-    classmask3 = classmask2.updateMask(mask2).clip(geometry)
-    classmask4 = classmask3.updateMask(mask3).clip(geometry)
-    classmask5 = classmask4.updateMask(mask4).clip(geometry)
-    classmask6 = classmask5.updateMask(mask5).clip(geometry)
+    classified = (
+        classified.mask(dcmask)
+        .clip(geometry)
+        .updateMask(mask1)
+        .clip(geometry)
+        .updateMask(mask2)
+        .clip(geometry)
+        .updateMask(mask3)
+        .clip(geometry)
+        .updateMask(mask4)
+        .clip(geometry)
+        .updateMask(mask5)
+        .clip(geometry)
+    )
 
     # Elevation analysis
 
@@ -82,20 +87,23 @@ def extract_sla_patch(image):
     elev_class_snow = elevation.mask(snow_mask.clip(geometry))
 
     # Create raster image to vectorize
-    vector_image = (
+    snow_vec = (
         classified.mask(snow_mask)
         .select("classification")
         .multiply(0)
         .unmask(-10)
         .clip(geometry)
-        .max(
-            classified.mask(ice_mask)
-            .select("classification")
-            .add(10)
-            .unmask(-10)
-            .clip(geometry)
-        )
     )
+
+    ice_vec = (
+        classified.mask(ice_mask)
+        .select("classification")
+        .add(10)
+        .unmask(-10)
+        .clip(geometry)
+    )
+
+    vector_image = snow_vec.max(ice_vec)
 
     # Calculate and store Areas for Ratio calculations
 
@@ -112,30 +120,34 @@ def extract_sla_patch(image):
         )
     )
 
-    snow_ice_ratio = snow_area.divide(ice_area)
-    ice_snow_ratio = ice_area.divide(snow_area)
-
+    # Set Snow condition to true when 95% of the snow/ice area is covered with snow
+    # With this condition the SnowLine is set to the minimal altitude of the glacier-
+    # outline area
     snow_cond = snow_part.gt(0.95)
 
     # Calculate lowest / highest possible SLA's
 
-    lowest_sla = elevation.reduceRegion(
-        **{
-            "reducer": ee.Reducer.min(),  # type: ignore
-            "geometry": geometry,
-            "scale": 30,
-            "bestEffort": True,
-        }
-    ).get("AVE_DSM")
+    lowest_sla = ee.Number(
+        elevation.reduceRegion(
+            **{
+                "reducer": ee.Reducer.min(),  # type: ignore
+                "geometry": geometry,
+                "scale": 30,
+                "bestEffort": True,
+            }
+        ).get("AVE_DSM")
+    )
 
-    highest_sla = elevation.reduceRegion(
-        **{
-            "reducer": ee.Reducer.max(),  # type: ignore
-            "geometry": geometry,
-            "scale": 30,
-            "bestEffort": True,
-        }
-    ).get("AVE_DSM")
+    highest_sla = ee.Number(
+        elevation.reduceRegion(
+            **{
+                "reducer": ee.Reducer.max(),  # type: ignore
+                "geometry": geometry,
+                "scale": 30,
+                "bestEffort": True,
+            }
+        ).get("AVE_DSM")
+    )
 
     # Vectorize the classified map with snow and ice patches
     classes = vector_image.reduceToVectors(
@@ -174,7 +186,6 @@ def extract_sla_patch(image):
     total_area = ee.Number(snow_ice_vector_map.aggregate_sum("count"))
 
     snow_area_ratio = snow_area_vec.divide(total_area)
-    ice_area_ratio = ice_area_vec.divide(total_area)
 
     snow_patch_ratio = ee.Number(snow_patch_area).divide(total_area).multiply(100)
     ice_patch_ratio = ee.Number(ice_patch_area).divide(total_area).multiply(100)
@@ -183,9 +194,13 @@ def extract_sla_patch(image):
 
     # Extract the zone where the two patches touch each other
 
-    img_2_cl = snow_ice_fc.reduceToImage(["label"], ee.Reducer.first())  # type: ignore
-    bigger_ice = img_2_cl.mask(img_2_cl.select("first").eq(0)).focal_max(2)
-    touching_zone = bigger_ice.subtract(img_2_cl.mask(img_2_cl.select("first").gte(9)))
+    snow_ice_image = snow_ice_fc.reduceToImage(["label"], ee.Reducer.first())  # type: ignore
+    
+    bigger_ice = snow_ice_image.mask(snow_ice_image.select("first").eq(0)).focal_max(2)
+    touching_zone = bigger_ice.subtract(
+        snow_ice_image.mask(snow_ice_image.select("first").gte(9))
+    )
+    
     elev_touch = elevation.addBands(touching_zone, ["first"])
     elevation_snow_line = elev_touch.mask(elev_touch.select("first").lt(-1))
 

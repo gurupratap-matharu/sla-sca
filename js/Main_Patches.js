@@ -188,6 +188,7 @@ exports.sla_extract_patch = function (img) {
   var maxice1 = result.filter(filterice).sort("count", false);
   var areaicevec = ee.Number(maxice1.aggregate_sum("count"));
   var maxice2 = ee.Feature(maxice1.first());
+  
   var maxiceifnull = ee.Feature(null).set("count", 0);
   var maxice = ee.Feature(ee.Algorithms.If(maxice2, maxice2, maxiceifnull));
 
