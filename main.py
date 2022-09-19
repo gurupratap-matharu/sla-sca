@@ -9,6 +9,7 @@ ee.Initialize()
 from sla.classifier import decision_tree  # noqa
 from sla.cloud_shadow_mask import add_cloud_shadow  # noqa
 from sla.hill_shadow import add_hill_shadow  # noqa
+from sla.main_patches import extract_sla_patch  # noqa
 from sla.prep import PreProcessor  # noqa
 
 logger = logging.getLogger(__name__)
@@ -69,8 +70,11 @@ preprocessed = add_hill_shadow(image_collection=preprocessed)
 print("initiating classifier...")
 map_collection = preprocessed.map(decision_tree)
 
+print("processing main patches...")
+map_collection = map_collection.map(extract_sla_patch)
+
 print("writing to local...")
-write_to_local(response=map_collection, filename="dump/classified.json")
+write_to_local(response=map_collection, filename="dump/final.json")
 
 end = time.time()
 print("All Done...!")
