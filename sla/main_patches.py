@@ -188,3 +188,72 @@ def extract_sla_patch(image):
     touching_zone = bigger_ice.subtract(img_2_cl.mask(img_2_cl.select("first").gte(9)))
     elev_touch = elevation.addBands(touching_zone, ["first"])
     elevation_snow_line = elev_touch.mask(elev_touch.select("first").lt(-1))
+
+    # Calculate mean altitude of the zone where the patches touch
+    mean_altitudes = elevation_snow_line.reduceRegion(
+        **{
+            "reducer": ee.Reducer.median(),  # type: ignore
+            "maxPixels": 1e8,
+            "geometry": geometry,
+            "bestEffort": True,
+        }
+    )
+
+    # Exception Handling
+
+    lowest_snow_elev = ee.Number(
+        elevation.clip(snow_max).reduceRegion(
+            **{
+                "reducer": ee.Reducer.min(),  # type: ignore
+                "geometry": geometry,
+                "scale": 30,
+                "bestEffort": True,
+            }
+        )
+    )
+
+    no_touch = ee.Number(
+        ee.Algorithms.If(snow_max_collection.size(), lowest_snow_elev, highest_sla)
+    )
+
+    snow_line_1 = mean_altitudes.get("AVE_DSM")
+    snow_line_2 = ee.Algorithms.If(snow_line_1, snow_line_1, no_touch)
+
+    snow_line = ee.Number(ee.Algorithms.If(snow_cond, lowest_sla, snow_line_2))
+
+    snow_line_std_dev = ee.Number(
+        elevation_snow_line.reduceRegion(
+            **{
+                "reducer": ee.Reducer.stdDev(),  # type: ignore
+                "maxPixels": 1e8,
+                "geometry": geometry,
+                "bestEffort": True,
+            }
+        ).get("AVE_DSM")
+    )
+
+    # Check if 95% of the glacier is convered with snow by settings SLA to the lowest
+    # elevation of the glacier
+    coverage_95 = ee.Algorithms.If(snow_cond, 0, snow_line_std_dev)
+    std_dev_sla = ee.Algorithms.If(mean_altitudes.size(), coverage_95, 0)
+
+    # Add date in MS-Excel readable format
+    image_date = ee.Number(classified.get("system_time_start"))
+
+    shorten = image_date.divide(1000).floor().divide(86400).add(25569)
+
+    # Create feature to return and export information in a table (eg CSV)
+    feature = ee.Feature(None)
+    feature = (
+        feature.set("Snow Cover Ratio", snow_area_ratio)
+        .set("SLA MP-Approach", snow_line)
+        .set("Ratio Area v/o Snow or Ice", void_part)
+        .set("system:time_start", image_date)
+        .set("date_MSxlsx", shorten)
+        .set("otsu", otsu)
+        .set("Considered Area for MP-SLA Extraction", relevant_area)
+        .set("stdDev SLA, 0 means no touch between Main patches [m]", std_dev_sla)
+        .set("ID_Glacier", glims_id)
+    )
+
+    return feature
