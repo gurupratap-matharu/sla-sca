@@ -195,12 +195,12 @@ def extract_sla_patch(image):
     # Extract the zone where the two patches touch each other
 
     snow_ice_image = snow_ice_fc.reduceToImage(["label"], ee.Reducer.first())  # type: ignore
-    
+
     bigger_ice = snow_ice_image.mask(snow_ice_image.select("first").eq(0)).focal_max(2)
     touching_zone = bigger_ice.subtract(
         snow_ice_image.mask(snow_ice_image.select("first").gte(9))
     )
-    
+
     elev_touch = elevation.addBands(touching_zone, ["first"])
     elevation_snow_line = elev_touch.mask(elev_touch.select("first").lt(-1))
 
