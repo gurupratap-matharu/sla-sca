@@ -170,7 +170,6 @@ def extract_sla_patch(image):
 
     ice_filter = ee.Filter.greaterThanOrEquals("label", 9)
     ice_max_collection = snow_ice_vector_map.filter(ice_filter).sort("count", False)
-    ice_area_vec = ee.Number(ice_max_collection.aggregate_sum("count"))
     ice_max = ee.Feature(ice_max_collection.first())
 
     # Check this implementation Essentially nulls are being replace with a conditional
