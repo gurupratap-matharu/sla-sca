@@ -1,8 +1,10 @@
+import logging
+
 import ee
 
-RGI = ee.FeatureCollection("users/josiaszeller/RGVI_v6")
-ALOS = ee.Image("JAXA/ALOS/AW3D30/V2_2")
-SRTM = ee.Image("USGS/SRTMGL1_003")
+from sla.settings import ALOS, ING, SRTM
+
+logger = logging.getLogger(__name__)
 
 
 def extract_sla_patch(image):
@@ -27,12 +29,11 @@ def extract_sla_patch(image):
             }
         ).getNumber("AVE_DSM")
 
-    glims_id = image.get("GLIMS_ID")
+    ing_id = image.get("ING_ID")
     otsu = image.get("otsu")
     dem_info = image.get("deminfo")
 
-    # TODO CHECK IF THIS (SHOULD BE ING)
-    geometry = RGI.filterMetadata("GLIMSId", "equals", glims_id)
+    geometry = ING.filterMetadata("ING_ID", "equals", ing_id)
 
     # DEM Selection
     dem_1 = SRTM.select("elevation").rename("AVE_DSM").clip(geometry)
@@ -108,6 +109,9 @@ def extract_sla_patch(image):
     # Calculate and store Areas for Ratio calculations
 
     ice_area = calculate_area(elev_class_ice)
+
+    logger.info("ice_area: %s", ice_area)
+
     snow_area = calculate_area(elev_class_snow)
     ice_snow_area = ice_area.add(snow_area)
 
@@ -170,6 +174,9 @@ def extract_sla_patch(image):
 
     ice_filter = ee.Filter.greaterThanOrEquals("label", 9)
     ice_max_collection = snow_ice_vector_map.filter(ice_filter).sort("count", False)
+    ice_area_vec = ee.Number(
+        ice_max_collection.aggregate_sum("count")
+    )  # ice_are_vec is UNUSED as per lint
     ice_max = ee.Feature(ice_max_collection.first())
 
     # Check this implementation Essentially nulls are being replace with a conditional
@@ -261,13 +268,15 @@ def extract_sla_patch(image):
     feature = (
         feature.set("Snow Cover Ratio", snow_area_ratio)
         .set("SLA MP-Approach", snow_line)
+        .set("ice_area", ice_area)
+        .set("total_area", total_area)
         .set("Ratio Area v/o Snow or Ice", void_part)
         .set("system:time_start", image_date)
         .set("date_MSxlsx", shorten)
         .set("otsu", otsu)
         .set("Considered Area for MP-SLA Extraction", relevant_area)
         .set("stdDev SLA, 0 means no touch between Main patches [m]", std_dev_sla)
-        .set("ID_Glacier", glims_id)
+        .set("ID_Glacier", ing_id)
     )
 
     return feature
