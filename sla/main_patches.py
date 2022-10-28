@@ -110,8 +110,6 @@ def extract_sla_patch(image):
 
     ice_area = calculate_area(elev_class_ice)
 
-    logger.info("ice_area: %s", ice_area)
-
     snow_area = calculate_area(elev_class_snow)
     ice_snow_area = ice_area.add(snow_area)
 
