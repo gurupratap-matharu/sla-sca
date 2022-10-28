@@ -12,11 +12,12 @@ from sla.hill_shadow import add_hill_shadow  # noqa
 from sla.main_patches import extract_sla_patch  # noqa
 from sla.prep import PreProcessor  # noqa
 
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("main")
 
 start = time.time()
 
-print("starting...")
+logger.info("starting...")
 
 
 def write_to_local(response, filename):
@@ -31,7 +32,7 @@ def write_to_local(response, filename):
     with open(filename, "w", encoding="utf-8") as f:
         f.write(json.dumps(response.getInfo()))
 
-    print(f"Results written to {filename}")
+    logger.info(f"Results written to {filename}")
 
 
 ing_id = "G718255O411666S"
@@ -57,25 +58,25 @@ preprocessor = PreProcessor(
     dem=dem,
 )
 
-print("preprocessing...")
+logger.info("preprocessing...")
 preprocessed = preprocessor.execute()
 
-print("processing cloud shadow mask...")
+logger.info("processing cloud shadow mask...")
 preprocessed = preprocessed.map(add_cloud_shadow)
 
-print("processing hill shadow...")
+logger.info("processing hill shadow...")
 preprocessed = add_hill_shadow(image_collection=preprocessed)
 
 
-print("initiating classifier...")
+logger.info("initiating classifier...")
 map_collection = preprocessed.map(decision_tree)
 
-print("processing main patches...")
+logger.info("processing main patches...")
 map_collection = map_collection.map(extract_sla_patch)
 
-print("writing to local...")
-write_to_local(response=map_collection, filename="dump/final.json")
+# logger.info("writing to local...")
+# write_to_local(response=map_collection, filename="dump/final.json")
 
 end = time.time()
-print("All Done...!")
-print(f"It took {end-start:.2f} seconds")
+logger.info("All Done...!")
+logger.info(f"It took {end-start:.2f} seconds")
