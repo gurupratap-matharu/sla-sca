@@ -13,10 +13,9 @@ import math
 
 import ee
 
-logger = logging.getLogger(__name__)
+from sla.settings import ING
 
-FC_PATH = "users/lcsruiz/Mapping_seasonal_glacier_melt_across_the_ANDES_with_SAR/Glaciares_Arg_Andes_dissolve"
-FC = ee.FeatureCollection(FC_PATH)
+logger = logging.getLogger(__name__)
 
 
 def rescale(img, exp, thresholds):
@@ -120,7 +119,7 @@ def add_cloud_shadow(image):
     contract_pixels = 10
     dilate_pixels = 15
     infrared_threshold = 0.45
-    geometry = FC.filterMetadata("ID_local", "equals", ing_id)
+    geometry = ING.filterMetadata("ID_local", "equals", ing_id)
 
     # Get cloud score
     image = add_cloud_score(image)

@@ -10,17 +10,12 @@ import json
 
 import ee
 
+from sla.settings import ING, L5, L7, L8, S2
+
 ee.Initialize()
 
 
 FILENAME = "dump/prep.json"
-ING = ee.FeatureCollection(
-    "users/lcsruiz/Mapping_seasonal_glacier_melt_across_the_ANDES_with_SAR/Glaciares_Arg_Andes_dissolve"
-)
-L5 = ee.ImageCollection("LANDSAT/LT05/C01/T1_TOA")
-L7 = ee.ImageCollection("LANDSAT/LE07/C01/T1_TOA")
-L8 = ee.ImageCollection("LANDSAT/LC08/C01/T1_TOA")
-S2 = ee.ImageCollection("COPERNICUS/S2")
 
 
 class PreProcessor:
@@ -305,7 +300,7 @@ class PreProcessor:
         img1 = img.select("green").neq(0)
         fc1 = img1.reduceToVectors(
             **{
-                "reducer": ee.Reducer.countEvery(),
+                "reducer": ee.Reducer.countEvery(),  # type: ignore
                 "geometry": self.geometry,
                 "scale": 30,
                 "maxPixels": 1e10,
@@ -316,7 +311,7 @@ class PreProcessor:
 
         area = fc1.reduceColumns(
             **{
-                "reducer": ee.Reducer.sum(),
+                "reducer": ee.Reducer.sum(),  # type: ignore
                 "selectors": ["count"],
             }
         )
@@ -333,7 +328,7 @@ class PreProcessor:
 
         return pixelarea.reduceRegion(
             **{
-                "reducer": ee.Reducer.sum(),
+                "reducer": ee.Reducer.sum(),  # type: ignore
                 "geometry": self.geometry,
                 "scale": 30,
                 "bestEffort": True,

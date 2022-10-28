@@ -1,9 +1,6 @@
 import ee
 
-SRTM = ee.Image("USGS/SRTMGL1_003")
-ING = ee.FeatureCollection(
-    "users/lcsruiz/Mapping_seasonal_glacier_melt_across_the_ANDES_with_SAR/Glaciares_Arg_Andes_dissolve"
-)
+from sla.settings import ING, SRTM
 
 
 def otsu(hist):
