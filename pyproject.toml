@@ -4,6 +4,9 @@ skip = ['docs']
 
 [tool.poetry]
 name = "sla-sca"
+packages = [
+    { include = "sla" },
+]
 version = "0.1.0"
 description = "Snow Line Altitude (SLA) monitoring for glaciers in Argentina."
 authors = ["Gurupratap Matharu <gurupratap.matharu@gmail.com>"]
