@@ -1,4 +1,5 @@
 import logging
+import pdb
 
 import ee
 
@@ -66,11 +67,11 @@ def extract_sla_patch(image):
         .updateMask(mask5)
         .clip(geometry)
     )
-
+    # TODO: EXPORT
     # Elevation analysis
 
     elevation = dem_glacier.select("AVE_DSM").clip(geometry)
-
+    # TODO: EXPORT
     # Combine snow and shadow on snow (sos)
     single_class_snow = classified.select("classification").eq(1)
     single_class_sos = classified.select("classification").eq(6)
@@ -109,9 +110,11 @@ def extract_sla_patch(image):
     # Calculate and store Areas for Ratio calculations
 
     ice_area = calculate_area(elev_class_ice)
-
+    # TODO: EXPORT
     snow_area = calculate_area(elev_class_snow)
+    # TODO: EXPORT
     ice_snow_area = ice_area.add(snow_area)
+    # TODO: EXPORT
 
     snow_part = snow_area.divide(ice_snow_area)
     void_part = ee.Number(1).subtract(
@@ -175,7 +178,9 @@ def extract_sla_patch(image):
     ice_area_vec = ee.Number(
         ice_max_collection.aggregate_sum("count")
     )  # ice_are_vec is UNUSED as per lint
+    # TODO: EXPORT
     ice_max = ee.Feature(ice_max_collection.first())
+    # TODO: EXPORT
 
     # Check this implementation Essentially nulls are being replace with a conditional
     is_ice_null = ee.Feature(None).set("count", 0)
@@ -187,23 +192,27 @@ def extract_sla_patch(image):
     )
 
     ice_patch_area = ee.Number(ice_max.get("count"))
+    # TODO: EXPORT
     total_area = ee.Number(snow_ice_vector_map.aggregate_sum("count"))
 
     snow_area_ratio = snow_area_vec.divide(total_area)
 
     snow_patch_ratio = ee.Number(snow_patch_area).divide(total_area).multiply(100)
     ice_patch_ratio = ee.Number(ice_patch_area).divide(total_area).multiply(100)
+    # TODO: EXPORT
 
     relevant_area = snow_patch_ratio.add(ice_patch_ratio)
 
     # Extract the zone where the two patches touch each other
 
     snow_ice_image = snow_ice_fc.reduceToImage(["label"], ee.Reducer.first())  # type: ignore
+    # TODO: EXPORT
 
     bigger_ice = snow_ice_image.mask(snow_ice_image.select("first").eq(0)).focal_max(2)
     touching_zone = bigger_ice.subtract(
         snow_ice_image.mask(snow_ice_image.select("first").gte(9))
     )
+    # TODO: EXPORT
 
     elev_touch = elevation.addBands(touching_zone, ["first"])
     elevation_snow_line = elev_touch.mask(elev_touch.select("first").lt(-1))
