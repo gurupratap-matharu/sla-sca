@@ -6,7 +6,7 @@
 Welcome to Snow Line Altitude Monitoring's documentation!
 =========================================================
 
-.. automodule:: main
+.. automodule:: sla
     :members:
 
 .. toctree::
