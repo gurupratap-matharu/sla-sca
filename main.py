@@ -11,7 +11,6 @@ from sla.cloud_shadow_mask import add_cloud_shadow  # noqa
 from sla.hill_shadow import add_hill_shadow  # noqa
 from sla.main_patches import extract_sla_patch  # noqa
 from sla.prep import PreProcessor  # noqa
-from sla.utils import write_to_local
 
 logging.basicConfig(level=logging.INFO)
 
@@ -40,7 +39,7 @@ def main():
     dem = "SRTM"
 
     for ing_id in ING_IDS:
-        logger.info("analysing id: %s", ing_id)
+        logger.info("analysing glacier: %s", ing_id)
 
         preprocessor = PreProcessor(
             ing_id=ing_id,
@@ -61,21 +60,21 @@ def main():
         preprocessed = preprocessed.map(add_cloud_shadow)
 
         logger.info("processing hill shadow...")
-        preprocessed = add_hill_shadow(
+        hill_shadow = add_hill_shadow(
             image_collection=preprocessed, hs_start=hs_start, hs_end=hs_end
         )
 
-        logger.info("initiating classifier...")
-        map_collection = preprocessed.map(decision_tree)
+        logger.info("classifying with decision tree...")
+        classified_collection = hill_shadow.map(decision_tree)
 
-        logger.info("initiating SLA extraction...")
-        map_collection = map_collection.map(extract_sla_patch)
+        logger.info("extracting snow line altitude (sla)...")
+        sla = classified_collection.map(extract_sla_patch)
 
         # logger.info("writing to local...")
         # write_to_local(response=map_collection, filename="dump/final.json")
 
     end = time.time()
-    logger.info("All Done...!")
+    logger.info("All Done...💅🏻💫💖!")
     logger.info(f"It took {end-start:.2f} seconds")
 
 
