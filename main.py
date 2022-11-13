@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("main")
 
 
-def main():
+def calculate_sla(ing_id="G718255O411666S"):
     """
     Main method which triggers the entire workflow to process a glacier data.
     """
@@ -26,7 +26,6 @@ def main():
 
     logger.info("starting...")
 
-    ING_IDS = ("G718255O411666S",)
     start_year = ee.Number(2022)
     end_year = ee.Number(2022)
     doy_start = ee.Number(50)
@@ -38,45 +37,45 @@ def main():
     hs_end = ee.Number(200)
     dem = "SRTM"
 
-    for ing_id in ING_IDS:
-        logger.info("analysing glacier: %s", ing_id)
+    logger.info("analysing glacier: %s", ing_id)
 
-        preprocessor = PreProcessor(
-            ing_id=ing_id,
-            start_year=start_year,
-            end_year=end_year,
-            doy_start=doy_start,
-            doy_end=doy_end,
-            cloudiness=cloudiness,
-            coverage=coverage,
-            hsboolean=hsboolean,
-            dem=dem,
-        )
+    preprocessor = PreProcessor(
+        ing_id=ing_id,
+        start_year=start_year,
+        end_year=end_year,
+        doy_start=doy_start,
+        doy_end=doy_end,
+        cloudiness=cloudiness,
+        coverage=coverage,
+        hsboolean=hsboolean,
+        dem=dem,
+    )
 
-        logger.info("preprocessing...")
-        preprocessed = preprocessor.execute()
+    logger.info("preprocessing...")
+    preprocessed = preprocessor.execute()
 
-        logger.info("processing cloud shadow mask...")
-        preprocessed = preprocessed.map(add_cloud_shadow)
+    logger.info("processing cloud shadow mask...")
+    cloud_shadow_collection = preprocessed.map(add_cloud_shadow)
 
-        logger.info("processing hill shadow...")
-        hill_shadow = add_hill_shadow(
-            image_collection=preprocessed, hs_start=hs_start, hs_end=hs_end
-        )
+    logger.info("processing hill shadow...")
+    hill_shadow_collection = add_hill_shadow(
+        image_collection=cloud_shadow_collection, hs_start=hs_start, hs_end=hs_end
+    )
 
-        logger.info("classifying with decision tree...")
-        classified_collection = hill_shadow.map(decision_tree)
+    logger.info("classifying with decision tree...")
+    classified_collection = hill_shadow_collection.map(decision_tree)
 
-        logger.info("extracting snow line altitude (sla)...")
-        sla = classified_collection.map(extract_sla_patch)
-
-        # logger.info("writing to local...")
-        # write_to_local(response=map_collection, filename="dump/final.json")
+    logger.info("extracting snow line altitude (sla)...")
+    sla = classified_collection.map(extract_sla_patch)
 
     end = time.time()
     logger.info("All Done...💅🏻💫💖!")
     logger.info(f"It took {end-start:.2f} seconds")
 
+    return sla
+
 
 if __name__ == "__main__":
-    main()
+    ING_ID = "G718255O411666S"  # <-- ONLY change this to try a different glacier
+    SLA = calculate_sla(ing_id=ING_ID)
+    # write_to_local(response=SLA, filename="dump/sla.json")
