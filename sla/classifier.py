@@ -59,7 +59,8 @@ def rescale(img, exp, thresholds):
 
 def add_true_hill_shadow(img, elevation, crs_transform):
     """
-    TODO
+    Adds additional band of shadow information to an existing image
+    Some of the possible values are - water, cloud, snow, ice, debris, etc
     """
 
     right_angle = ee.Number(90)
@@ -90,7 +91,8 @@ def add_dummy_hill_shadow(img, geometry):
 
 def decision_tree(image):
     """
-    Classifies each image... TODO
+    Identifies what's the actual content of each image and classifies it
+    accordingly
     """
     # Get input values from image to be classified
 

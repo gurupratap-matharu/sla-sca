@@ -145,8 +145,6 @@ class PreProcessor:
             ee.Image(1).clip(self.geometry).select("constant").rename("green")
         )
 
-        # TODO check if areatotal is needed?
-        # areatotal = self.geometry.first().get("Area")
         self.area_glacier_IMG = self.area_calc_rast(glacier_area)
 
         self.l5_filtered = self.filter_l5()
@@ -373,18 +371,13 @@ class PreProcessor:
         Add all the 'Quality-Information' to the image
         """
 
-        # TODO: VEER CHECK THIS FUNCTION. DO WE NEED RGI
-        # TACKLE GLOBAL VARIABLES
-
         clip = data.clip(self.geometry_buffered)
         quality = self.cloud_nocloud_ratio(clip)
         image = clip.set("noclouds", quality)
         sens = clip.get("SPACECRAFT_ID")
 
         # calculate the area for the image to detect, if there are parts without information
-        area_rgi_outline = self.area_calc_rast(clip)  # TODO DO WE NEED THIS? ASK
-        # RGI:
-        # ING: inventario nacional de glaciares de Argentina
+        area_rgi_outline = self.area_calc_rast(clip)
 
         # calculate ratio of coverage from one image over the glacier
         arearatio = area_rgi_outline.divide(self.area_glacier_IMG).multiply(100)
@@ -470,7 +463,7 @@ class PreProcessor:
         Filters out all duplicate images in an image collection.
         """
 
-        # TODO: FIND OUT LOGIC FOR THIS. ORIGINAL IMPLEMENTATION SEEMS AMBIGIOUS
+        # Placeholder method incase we encounter duplicates in the image collection.
         return image
 
 
