@@ -1,10 +1,8 @@
 import logging
 
 import ee
-import geemap
 
 from sla.settings import ALOS, ING, SRTM
-from sla.utils import write_to_local
 
 logger = logging.getLogger(__name__)
 
@@ -68,22 +66,12 @@ def extract_sla_patch(image):
         .updateMask(mask5)
         .clip(geometry)
     )
-    # TODO: EXPORT
-    # Elevation analysis
 
     elevation = dem_glacier.select("AVE_DSM").clip(geometry)
-    # write_to_local_to_local(response=elevation, filename="exports/elevation.json")
 
-    # TODO: EXPORT
     # Combine snow and shadow on snow (sos)
     single_class_snow = classified.select("classification").eq(1)
-    # write_to_local_to_local(
-    #    response=single_class_snow, filename="exports/single_class_snow.json"
-    # )
-
     single_class_sos = classified.select("classification").eq(6)
-    # write_to_local_to_local(response=single_class_sos, filename="exports/single_class_sos.json")
-
     snow_mask = single_class_snow.max(single_class_sos)
 
     # Combine ice and shadow on ice (soi)
@@ -117,15 +105,9 @@ def extract_sla_patch(image):
     vector_image = snow_vec.max(ice_vec)
 
     # Calculate and store Areas for Ratio calculations
-
     ice_area = calculate_area(elev_class_ice)
-    # write_to_local_to_local(response=ice_area, filename="exports/ice_area.json")
-
     snow_area = calculate_area(elev_class_snow)
-    # write_to_local_to_local(response=snow_area, filename="exports/snow_area.json")
-
     ice_snow_area = ice_area.add(snow_area)
-    # write_to_local_to_local(response=ice_snow_area, filename="exports/ice_snow_area.json")
 
     snow_part = snow_area.divide(ice_snow_area)
     void_part = ee.Number(1).subtract(
@@ -186,13 +168,7 @@ def extract_sla_patch(image):
 
     ice_filter = ee.Filter.greaterThanOrEquals("label", 9)
     ice_max_collection = snow_ice_vector_map.filter(ice_filter).sort("count", False)
-    ice_area_vec = ee.Number(
-        ice_max_collection.aggregate_sum("count")
-    )  # ice_are_vec is UNUSED as per lint
-    # write_to_local_to_local(response=ice_area_vec, filename="exports/ice_area_vec.json")
-
     ice_max = ee.Feature(ice_max_collection.first())
-    # write_to_local_to_local(response=ice_max, filename="exports/ice_max.json")
 
     # Check this implementation Essentially nulls are being replace with a conditional
     is_ice_null = ee.Feature(None).set("count", 0)
@@ -204,28 +180,22 @@ def extract_sla_patch(image):
     )
 
     ice_patch_area = ee.Number(ice_max.get("count"))
-    # write_to_local_to_local(response=ice_patch_area, filename="exports/ice_patch_area.json")
-
     total_area = ee.Number(snow_ice_vector_map.aggregate_sum("count"))
 
     snow_area_ratio = snow_area_vec.divide(total_area)
-
     snow_patch_ratio = ee.Number(snow_patch_area).divide(total_area).multiply(100)
     ice_patch_ratio = ee.Number(ice_patch_area).divide(total_area).multiply(100)
-    # write_to_local_to_local(response=ice_patch_ratio, filename="exports/ice_patch_ratio.json")
 
     relevant_area = snow_patch_ratio.add(ice_patch_ratio)
 
     # Extract the zone where the two patches touch each other
 
     snow_ice_image = snow_ice_fc.reduceToImage(["label"], ee.Reducer.first())  # type: ignore
-    # write_to_local_to_local(response=snow_ice_image, filename="exports/snow_ice_image.json")
 
     bigger_ice = snow_ice_image.mask(snow_ice_image.select("first").eq(0)).focal_max(2)
     touching_zone = bigger_ice.subtract(
         snow_ice_image.mask(snow_ice_image.select("first").gte(9))
     )
-    # write_to_local_to_local(response=touching_zone, filename="exports/touching_zone.json")
 
     elev_touch = elevation.addBands(touching_zone, ["first"])
     elevation_snow_line = elev_touch.mask(elev_touch.select("first").lt(-1))
